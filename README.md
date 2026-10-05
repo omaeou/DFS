@@ -1,0 +1,3 @@
+Here will be info about project, install instruction and other info. 
+
+soon...........
