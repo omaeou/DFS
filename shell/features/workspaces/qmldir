@@ -1,0 +1,2 @@
+module features.workspaces
+WorkspacesView 1.0 WorkspacesView.qml

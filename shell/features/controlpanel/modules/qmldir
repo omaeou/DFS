@@ -1,0 +1,7 @@
+module features.controlpanel.modules
+AudioControl 1.0 AudioControl.qml
+Volume 1.0 Volume.qml
+Mic 1.0 Mic.qml
+Wifi 1.0 Wifi.qml
+Bluetooth 1.0 Bluetooth.qml
+AppearanceSettings 1.0 AppearanceSettings.qml

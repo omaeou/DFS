@@ -1,0 +1,2 @@
+module features.activeWindow
+ActiveWindowView 1.0 ActiveWindowView.qml

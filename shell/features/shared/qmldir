@@ -1,0 +1,2 @@
+module features.shared
+singleton GlobalState 1.0 GlobalState.qml

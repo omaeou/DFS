@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "bar": {
+    "height": 60,
+    "margin": 10,
+    "layout": {
+      "left": [
+        "systemInfo",
+        "activeWindow"
+      ],
+      "center": [
+        "workspaces",
+        "clock"
+      ],
+      "right": [
+        "systray",
+        "controlPanelToggle"
+      ]
+    }
+  },
+  "geometry": {
+    "width": 356,
+    "height": 520,
+    "marginTop": 5,
+    "marginRight": 12
+  },
+  "theme": {
+    "customColors": {}
+  },
+  "layout": [
+    "Wifi",
+    "Bluetooth",
+    "Volume",
+    "Mic",
+    "Appearance"
+  ],
+  "modules": {
+    "Wifi": {
+      "showIcon": true,
+      "showSsid": true
+    },
+    "Bluetooth": {
+      "showIcon": true,
+      "showDevice": true
+    },
+    "Volume": {
+      "showPercentage": true,
+      "step": 1,
+      "maxVolume": 100
+    },
+    "Mic": {
+      "showPercentage": true,
+      "step": 1,
+      "maxVolume": 100
+    },
+    "Clock": {
+      "format": "ddd DD MMM HH:mm",
+      "fontSize": 13
+    },
+    "Workspaces": {
+      "count": 10,
+      "romanNumerals": true,
+      "animationDuration": 250
+    },
+    "ActiveWindow": {
+      "maxWidth": 250
+    },
+    "SystemInfo": {
+      "showCpu": true,
+      "showMemory": true,
+      "showTemperature": true,
+      "showGpu": true,
+      "refreshInterval": 3000
+    },
+    "SysTray": {
+      "iconSize": 20,
+      "spacing": 8
+    }
+  },
+  "plugins": {
+    "example-clock": {
+      "enabled": false,
+      "apiVersion": 1,
+      "entrypoint": "plugins/example-clock/ExamplePlugin.qml",
+      "settings": {
+        "label": "A sample plugin"
+      }
+    }
+  },
+  "appearance": {
+    "skin": "bloodsteel",
+    "colorScheme": "crimson",
+    "animations": "balanced",
+    "ornaments": true,
+    "glow": true,
+    "motionScale": 1.0
+  }
+}

@@ -1,0 +1,2 @@
+module core.ipc
+singleton DaemonClient 1.0 DaemonClient.qml

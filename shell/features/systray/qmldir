@@ -1,0 +1,2 @@
+module features.systray
+SysTrayView 1.0 SysTrayView.qml

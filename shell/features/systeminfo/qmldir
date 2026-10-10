@@ -1,0 +1,2 @@
+module features.systeminfo
+SystemInfoView 1.0 SystemInfoView.qml

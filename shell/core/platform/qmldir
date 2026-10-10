@@ -1,0 +1,3 @@
+module core.platform
+singleton HyprlandAdapter 1.0 HyprlandAdapter.qml
+singleton CompositorAdapter 1.0 CompositorAdapter.qml

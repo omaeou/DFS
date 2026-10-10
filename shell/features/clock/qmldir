@@ -1,0 +1,2 @@
+module features.clock
+ClockView 1.0 ClockView.qml

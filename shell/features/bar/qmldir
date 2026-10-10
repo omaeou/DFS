@@ -1,0 +1,3 @@
+module features.bar
+BarView 1.0 BarView.qml
+TopBar 1.0 TopBar.qml

@@ -1,0 +1,2 @@
+module core.modules
+singleton ModuleRegistry 1.0 ModuleRegistry.qml

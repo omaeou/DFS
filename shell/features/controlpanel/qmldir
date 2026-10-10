@@ -1,0 +1,2 @@
+module features.controlpanel
+ControlPanelView 1.0 ControlPanelView.qml
