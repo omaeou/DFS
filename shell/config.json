@@ -24,6 +24,14 @@
     "marginTop": 5,
     "marginRight": 12
   },
+  "appearance": {
+    "skin": "ashen",
+    "colorScheme": "violet",
+    "animations": "full",
+    "motionScale": 1,
+    "ornaments": true,
+    "glow": true
+  },
   "theme": {
     "customColors": {}
   },
@@ -53,6 +61,7 @@
       "step": 1,
       "maxVolume": 100
     },
+    "Appearance": {},
     "Clock": {
       "format": "ddd DD MMM HH:mm",
       "fontSize": 13
@@ -86,13 +95,5 @@
         "label": "A sample plugin"
       }
     }
-  },
-  "appearance": {
-    "skin": "bloodsteel",
-    "colorScheme": "crimson",
-    "animations": "balanced",
-    "ornaments": true,
-    "glow": true,
-    "motionScale": 1.0
   }
 }

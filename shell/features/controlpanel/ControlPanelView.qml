@@ -53,9 +53,90 @@ PanelWindow {
     ListModel { id: contextModel }
 
     // Device-list commands stay in the host so modules do not need shell access.
-    Process { id: fetchWifiProcess; command: ["sh", "-c", "nmcli -t -f SSID,SIGNAL dev wifi | sed 's/\\\\:/\x1f/g' | awk -F: '$1 != \"\" {print $1\"|\"$2}' | sed 's/\\x1f/:/g' | awk '!seen[$1]++' | head -n 8"]; stdout: SplitParser { onRead: data => { let p = data.trim().split("|"); if(p.length >= 2) contextModel.append({itemId: p[0], itemName: p[0], itemExtra: p[1] + "%", itemType: "wifi"}) } } }
-    Process { id: fetchBtProcess; command: ["sh", "-c", "bluetoothctl devices | head -n 8 | awk '{mac=$2; $1=\"\"; $2=\"\"; sub(/^[ \\t]+/, \"\"); print mac\"|\"$0}'"]; stdout: SplitParser { onRead: data => { let p = data.trim().split("|"); if(p.length >= 2) contextModel.append({itemId: p[0], itemName: p[1], itemExtra: "", itemType: "bt"}) } } }
-    Process { id: fetchAudioProcess; command: ["sh", "-c", root.audioTab === "sink" ? "pactl list sinks | awk '/^ +Name: / {name=$2} /^ +Description: / {sub(/^ +Description: /, \"\"); print name\"|\"$0}'" : "pactl list sources | awk '/^ +Name: / {name=$2} /^ +Description: / {sub(/^ +Description: /, \"\"); print name\"|\"$0}'"]; stdout: SplitParser { onRead: data => { let p = data.trim().split("|"); if(p.length >= 2 && !p[0].includes("monitor")) contextModel.append({itemId: p[0], itemName: p[1], itemExtra: "", itemType: "audio"}) } } }
+    Process {
+        id: fetchWifiProcess
+        // Force a fresh scan; otherwise NetworkManager may return only the one
+        // access point left in its cache when this menu was opened.
+        command: ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list", "--rescan", "yes"]
+        stdout: SplitParser {
+            onRead: data => {
+                let fields = [], value = "", escaped = false
+                for (let i = 0; i < data.length; ++i) {
+                    const ch = data[i]
+                    if (escaped) { value += ch; escaped = false }
+                    else if (ch === "\\") escaped = true
+                    else if (ch === ":" && fields.length < 2) { fields.push(value); value = "" }
+                    else value += ch
+                }
+                if (escaped) value += "\\"
+                fields.push(value)
+                const ssid = fields[0].trim()
+                if (!ssid) return
+                for (let i = 0; i < contextModel.count; ++i)
+                    if (contextModel.get(i).itemType === "wifi" && contextModel.get(i).itemId === ssid) return
+                contextModel.append({itemId: ssid, itemName: ssid, itemExtra: fields[1] + "%", itemType: "wifi", secured: fields[2].trim() !== ""})
+            }
+        }
+    }
+    Process { id: fetchBtProcess; command: ["sh", "-c", "bluetoothctl devices | head -n 8 | awk '{mac=$2; $1=\"\"; $2=\"\"; sub(/^[ \\t]+/, \"\"); print mac\"|\"$0}'"]; stdout: SplitParser { onRead: data => { let p = data.trim().split("|"); if(p.length >= 2) contextModel.append({itemId: p[0], itemName: p[1], itemExtra: "", itemType: "bt", secured: false}) } } }
+    function cleanedAudioLabel(value) {
+        const label = String(value || "").trim()
+        if (!label || label === "(null)" || label.toLowerCase() === "unknown") return ""
+        return label
+    }
+
+    function audioDisplayName(device) {
+        const properties = device.properties || ({})
+        const candidates = [
+            properties["node.nick"],
+            device.description,
+            properties["device.description"],
+            properties["alsa.card_name"],
+            properties["device.product.name"],
+            properties["alsa.name"]
+        ]
+        for (let i = 0; i < candidates.length; ++i) {
+            const label = cleanedAudioLabel(candidates[i])
+            if (label) return label
+        }
+
+        // Last-resort fallback for virtual or incomplete devices without labels.
+        return String(device.name || "Аудиоустройство")
+            .replace(/^(alsa_(input|output)|bluez_(input|output))\./, "")
+            .replace(/\.(analog-stereo|analog-surround-[^.]+|mono-fallback|iec958-stereo|hdmi-stereo[^.]*)$/, "")
+            .replace(/[._-]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+    }
+
+    Process {
+        id: fetchAudioProcess
+        command: ["pactl", "-f", "json", "list", root.audioTab === "sink" ? "sinks" : "sources"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const devices = JSON.parse(this.text)
+                    for (let i = 0; i < devices.length; ++i) {
+                        const device = devices[i]
+                        const name = String(device.name || "")
+                        const properties = device.properties || ({})
+                        const mediaClass = String(properties["media.class"] || "")
+                        if (!name || name.endsWith(".monitor") || mediaClass === "Audio/Source/Virtual")
+                            continue
+                        contextModel.append({
+                            itemId: name,
+                            itemName: root.audioDisplayName(device),
+                            itemExtra: "",
+                            itemType: "audio",
+                            secured: false
+                        })
+                    }
+                } catch (error) {
+                    console.warn("[ControlPanel] Could not parse pactl device list:", String(error))
+                }
+            }
+        }
+    }
 
     function openCustomMenu(type, title) {
         contextModel.clear(); root.menuTitle = title; root.currentMenuType = type; root.isMenuOpen = true; refreshMenuData()
@@ -65,6 +146,46 @@ PanelWindow {
         if (root.currentMenuType === "wifi") fetchWifiProcess.running = true
         else if (root.currentMenuType === "bt") fetchBtProcess.running = true
         else if (root.currentMenuType === "audio") fetchAudioProcess.running = true
+    }
+
+    property string pendingWifiSsid: ""
+    function connectWifi(ssid, secured) {
+        if (!secured) {
+            execProcess.command = ["nmcli", "device", "wifi", "connect", ssid]
+            execProcess.running = true
+            return
+        }
+        pendingWifiSsid = ssid
+        wifiPasswordField.text = ""
+        wifiPasswordDialog.open()
+    }
+    Dialog {
+        id: wifiPasswordDialog
+        title: "Подключение к сети"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(root.width - 40, 310)
+        standardButtons: Dialog.Cancel
+        background: Rectangle { color: root.safeTheme.bg; radius: 9; border.color: root.safeTheme.frame }
+        contentItem: ColumnLayout {
+            spacing: 9
+            Text { text: root.pendingWifiSsid; color: root.safeTheme.textMain; font.family: root.safeTheme.font; elide: Text.ElideRight; Layout.fillWidth: true }
+            TextField {
+                id: wifiPasswordField
+                Layout.fillWidth: true
+                placeholderText: "Пароль сети"
+                echoMode: TextInput.Password
+                color: root.safeTheme.textMain
+                onAccepted: wifiPasswordDialog.connectToNetwork()
+            }
+            Button { text: "Подключиться"; Layout.alignment: Qt.AlignRight; onClicked: wifiPasswordDialog.connectToNetwork() }
+        }
+        function connectToNetwork() {
+            if (!wifiPasswordField.text) return
+            root.execProcess.command = ["nmcli", "device", "wifi", "connect", root.pendingWifiSsid, "password", wifiPasswordField.text]
+            root.execProcess.running = true
+            close()
+        }
     }
 
     Rectangle {
@@ -239,6 +360,13 @@ PanelWindow {
                         font.bold: true
                         elide: Text.ElideRight
                     }
+                    Text {
+                        visible: root.currentMenuType === "wifi"
+                        text: "" + contextModel.count
+                        color: root.safeTheme.rune || root.safeTheme.textDark
+                        font.family: root.safeTheme.font
+                        font.pixelSize: 10
+                    }
                     Rectangle {
                         width: 28; height: 28; radius: 5
                         color: root.safeTheme.bgAlt
@@ -264,15 +392,20 @@ PanelWindow {
                     clip: true
                     spacing: 7
                     model: contextModel
+                    boundsBehavior: Flickable.StopAtBounds
+                    onCountChanged: if (count > 0) positionViewAtBeginning()
                     add: Transition {
                         NumberAnimation { property: "opacity"; from: 0; to: 1; duration: GlobalState.animationDuration(160); easing.type: Easing.OutCubic }
-                        NumberAnimation { property: "y"; from: 6; to: 0; duration: GlobalState.animationDuration(160); easing.type: Easing.OutCubic }
+                        // ListView owns delegate y positions; animating every new
+                        // row to y=0 made the entire network list overlap in one row.
+                        NumberAnimation { property: "scale"; from: 0.96; to: 1; duration: GlobalState.animationDuration(160); easing.type: Easing.OutCubic }
                     }
                     delegate: Rectangle {
                         required property string itemId
                         required property string itemName
                         required property string itemExtra
                         required property string itemType
+                        required property bool secured
                         width: menuList.width
                         height: 50
                         radius: 7
@@ -327,7 +460,7 @@ PanelWindow {
                             }
                             Text {
                                 width: parent.width
-                                text: itemType === "wifi" ? "Wi-Fi network" : (itemType === "bt" ? itemId : (itemType === "audio" ? itemId : ""))
+                                text: itemType === "wifi" ? (secured ? "Защищённая сеть · Wi-Fi" : "Открытая сеть · Wi-Fi") : (itemType === "bt" ? itemId : (itemType === "audio" ? (root.audioTab === "sink" ? "Устройство вывода" : "Устройство ввода") : ""))
                                 color: root.safeTheme.textDark
                                 font.family: root.safeTheme.font
                                 font.pixelSize: 9
@@ -351,7 +484,8 @@ PanelWindow {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 if (itemType === "wifi") {
-                                    execProcess.command = ["nmcli", "device", "wifi", "connect", itemId]
+                                    root.connectWifi(itemId, secured)
+                                    return
                                 } else if (itemType === "bt") {
                                     execProcess.command = ["bluetoothctl", "connect", itemId]
                                 } else if (itemType === "audio") {

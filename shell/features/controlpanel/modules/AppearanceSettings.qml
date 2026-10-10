@@ -12,8 +12,8 @@ Item {
     implicitWidth: 292
     implicitHeight: 90
 
-    readonly property var skinIds: ["bloodsteel", "ashen", "obsidian", "verdigris", "custom"]
-    readonly property var skinNames: ["Bloodsteel", "Ashen", "Obsidian", "Verdigris", "Custom"]
+    readonly property var skinIds: ["bloodsteel", "ashen", "obsidian", "verdigris", "alchemy", "runes", "custom"]
+    readonly property var skinNames: ["Bloodsteel", "Ashen", "Obsidian", "Verdigris", "Alchemy", "Runes", "Custom"]
     readonly property var schemeIds: ["crimson", "violet", "frost", "jade", "amber"]
     readonly property var schemeNames: ["Crimson", "Violet", "Frost", "Jade", "Amber"]
     readonly property var animationIds: ["full", "balanced", "reduced", "off"]
@@ -155,7 +155,7 @@ Item {
                 implicitHeight: 28
                 model: root.skinNames
                 currentIndex: Math.max(0, root.skinIds.indexOf(GlobalState.config.appearance.skin))
-                onActivated: GlobalState.updateAppearance("skin", root.skinIds[index])
+                onActivated: function(index) { GlobalState.updateAppearance("skin", root.skinIds[index]) }
                 contentItem: Text {
                     leftPadding: 7
                     rightPadding: 16
@@ -225,7 +225,7 @@ Item {
                 implicitHeight: 28
                 model: root.schemeNames
                 currentIndex: Math.max(0, root.schemeIds.indexOf(GlobalState.config.appearance.colorScheme))
-                onActivated: GlobalState.updateAppearance("colorScheme", root.schemeIds[index])
+                onActivated: function(index) { GlobalState.updateAppearance("colorScheme", root.schemeIds[index]) }
                 contentItem: Text {
                     leftPadding: 7
                     rightPadding: 16
@@ -295,7 +295,7 @@ Item {
                 implicitHeight: 28
                 model: root.animationNames
                 currentIndex: Math.max(0, root.animationIds.indexOf(GlobalState.config.appearance.animations))
-                onActivated: GlobalState.updateAppearance("animations", root.animationIds[index])
+                onActivated: function(index) { GlobalState.updateAppearance("animations", root.animationIds[index]) }
                 contentItem: Text {
                     leftPadding: 7
                     rightPadding: 16

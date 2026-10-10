@@ -85,6 +85,22 @@ Singleton {
             borderActive: "#376d56", textMain: "#c7d9cf", textLight: "#f1fff6",
             textDark: "#77958a", elementRadius: 8, radius: 11,
             font: "JetBrainsMono Nerd Font"
+        },
+        alchemy: {
+            bg: "#0a100d", bgAlt: "#18231c", bgHover: "#263a2a",
+            surfaceTop: "#263327", surfaceBottom: "#0a100c",
+            frame: "#64744f", rune: "#d0b77b", border: "#394a38",
+            borderActive: "#8b7542", textMain: "#d7ddc8", textLight: "#fff9e8",
+            textDark: "#8c987a", elementRadius: 10, radius: 13,
+            font: "JetBrainsMono Nerd Font"
+        },
+        runes: {
+            bg: "#080a12", bgAlt: "#151a2a", bgHover: "#202c48",
+            surfaceTop: "#20283d", surfaceBottom: "#090b13",
+            frame: "#536987", rune: "#a9d4dc", border: "#303b55",
+            borderActive: "#467d9a", textMain: "#d0dceb", textLight: "#f2f8ff",
+            textDark: "#7e91ab", elementRadius: 6, radius: 10,
+            font: "JetBrainsMono Nerd Font"
         }
     })
 
@@ -98,7 +114,12 @@ Singleton {
 
     // Always expose a complete theme object. A bad/mid-reload config must not
     // make consumers such as PanelWindow evaluate `undefined.radius`.
-    readonly property var effectiveTheme: safeBuildEffectiveTheme()
+    // Read `config` directly in the binding so all theme consumers are notified
+    // when updateAppearance replaces the config object.
+    readonly property var effectiveTheme: {
+        const configSnapshot = config
+        return safeBuildEffectiveTheme()
+    }
     readonly property bool animationsEnabled: config.appearance.animations !== "off"
     readonly property bool idleEffectsEnabled: config.appearance.animations === "full" && config.appearance.glow === true && config.appearance.ornaments !== false
     readonly property bool ornamentsEnabled: config.appearance.ornaments !== false
@@ -237,8 +258,13 @@ Singleton {
             const merged = merge(clone(state.defaults), source)
             if (!isPlainObject(merged.appearance))
                 throw new Error("appearance must be an object")
-            if (!isPlainObject(merged.theme.customColors))
-                throw new Error("theme.customColors must be an object")
+            // Normalize through local references. Avoid repeatedly dereferencing
+            // nested QVariant/QML maps during validation (customColors may be
+            // absent in older or hand-edited configs).
+            const normalizedTheme = isPlainObject(merged.theme) ? merged.theme : ({})
+            const customColors = isPlainObject(normalizedTheme.customColors) ? normalizedTheme.customColors : ({})
+            normalizedTheme.customColors = customColors
+            merged.theme = normalizedTheme
             if (!isPlainObject(merged.bar.layout))
                 throw new Error("bar.layout must be an object")
             if (!Array.isArray(merged.bar.layout.left) ||
@@ -267,8 +293,8 @@ Singleton {
             requireNumber(merged.appearance, "motionScale", "appearance.motionScale", 0)
             if (merged.appearance.motionScale > 3)
                 throw new Error("appearance.motionScale must be <= 3")
-            if (["bloodsteel", "ashen", "obsidian", "verdigris", "custom"].indexOf(merged.appearance.skin) < 0)
-                throw new Error("appearance.skin must be bloodsteel, ashen, obsidian, verdigris, or custom")
+            if (["bloodsteel", "ashen", "obsidian", "verdigris", "alchemy", "runes", "custom"].indexOf(merged.appearance.skin) < 0)
+                throw new Error("appearance.skin must be bloodsteel, ashen, obsidian, verdigris, alchemy, runes, or custom")
             if (["crimson", "violet", "frost", "jade", "amber"].indexOf(merged.appearance.colorScheme) < 0)
                 throw new Error("appearance.colorScheme must be crimson, violet, frost, jade, or amber")
             if (["full", "balanced", "reduced", "off"].indexOf(merged.appearance.animations) < 0)
@@ -282,15 +308,16 @@ Singleton {
             })
             stage = "validate theme colors"
             const colorKeys = ["bg", "bgAlt", "bgHover", "surfaceTop", "surfaceBottom", "frame", "rune", "accentGlow", "border", "borderActive", "accent", "accentActive", "textMain", "textLight", "textDark", "font"]
-            colorKeys.forEach(function (key) {
-                if (merged.theme.customColors[key] !== undefined && typeof merged.theme.customColors[key] !== "string")
-                    throw new Error("theme.customColors." + key + " must be a string")
-            })
-            ["elementRadius", "radius"].forEach(function (key) {
-                if (merged.theme.customColors[key] !== undefined &&
-                    (typeof merged.theme.customColors[key] !== "number" || merged.theme.customColors[key] < 0))
-                    throw new Error("theme.customColors." + key + " must be a non-negative number")
-            })
+            const customColorKeys = Object.keys(customColors)
+            for (let i = 0; i < customColorKeys.length; ++i) {
+                const customKey = customColorKeys[i]
+                const customValue = customColors[customKey]
+                if (colorKeys.indexOf(customKey) >= 0 && typeof customValue !== "string")
+                    throw new Error("theme.customColors." + customKey + " must be a string")
+                if ((customKey === "elementRadius" || customKey === "radius") &&
+                    (typeof customValue !== "number" || customValue < 0))
+                    throw new Error("theme.customColors." + customKey + " must be a non-negative number")
+            }
 
             Object.keys(merged.plugins).forEach(function (pluginId) {
                 const plugin = merged.plugins[pluginId]
@@ -339,7 +366,7 @@ Singleton {
 
     function updateAppearance(key, value) {
         const allowed = {
-            skin: ["bloodsteel", "ashen", "obsidian", "verdigris", "custom"],
+            skin: ["bloodsteel", "ashen", "obsidian", "verdigris", "alchemy", "runes", "custom"],
             colorScheme: ["crimson", "violet", "frost", "jade", "amber"],
             animations: ["full", "balanced", "reduced", "off"],
             ornaments: [true, false],
