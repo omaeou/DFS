@@ -150,10 +150,17 @@ Item {
                     font.pixelSize: 13
                 }
                 MouseArea {
+                    id: muteHit
                     anchors.fill: parent
                     enabled: root.nodeAvailable
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.toggleMute()
+                }
+                ThemeToolTip {
+                    targetItem: muteHit
+                    visible: muteHit.containsMouse
+                    text: root.isMuted ? "Включить звук" : (root.microphone ? "Выключить микрофон" : "Выключить звук")
                 }
             }
 
@@ -183,6 +190,11 @@ Item {
                         root.panel.openCustomMenu("audio", root.microphone ? "Устройства ввода" : "Устройства вывода")
                     }
                 }
+                ThemeToolTip {
+                    targetItem: selectorMouse
+                    visible: selectorMouse.containsMouse
+                    text: root.microphone ? "Выбрать устройство ввода" : "Выбрать устройство вывода"
+                }
             }
         }
 
@@ -193,6 +205,7 @@ Item {
             anchors.top: headingRow.bottom
             anchors.topMargin: 5
             height: 26
+            hoverEnabled: true
             from: 0
             to: root.volumeLimit
             stepSize: Math.max(1, Number(root.modConf.step) || 1)
@@ -201,6 +214,11 @@ Item {
             enabled: root.nodeAvailable
             opacity: enabled ? 1.0 : 0.5
             onMoved: root.requestVolumeWrite(value)
+            ThemeToolTip {
+                targetItem: volumeSlider
+                visible: volumeSlider.hovered
+                text: root.microphone ? "Уровень микрофона · " + Math.round(volumeSlider.value) + "%" : "Громкость вывода · " + Math.round(volumeSlider.value) + "%"
+            }
 
             background: Rectangle {
                 x: volumeSlider.leftPadding + 4

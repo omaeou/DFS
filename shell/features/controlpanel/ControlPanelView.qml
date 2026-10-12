@@ -24,10 +24,30 @@ PanelWindow {
     visible: GlobalState.isControlPanelOpen
 
     // Apply any on-disk config changes when the panel is opened.
-    onVisibleChanged: { if (visible) GlobalState.reloadConfig() }
+    onVisibleChanged: {
+        if (visible) {
+            GlobalState.reloadConfig()
+            consumeNetworkMenuRequest()
+        } else {
+            // Reopen the panel on its root view instead of restoring a stale
+            // Wi-Fi, Bluetooth or audio submenu from the previous session.
+            isMenuOpen = false
+            menuTitle = ""
+            currentMenuType = ""
+            audioTab = "sink"
+            contextModel.clear()
+            fetchWifiProcess.running = false
+            fetchBtProcess.running = false
+            fetchAudioProcess.running = false
+            if (wifiPasswordDialog.visible) wifiPasswordDialog.close()
+            GlobalState.isNetworkPortalOpen = false
+            GlobalState.requestNetworkMenu = false
+        }
+    }
 
     anchors { top: true; right: true }
-    margins { top: GlobalState.config.geometry.marginTop; right: GlobalState.config.geometry.marginRight }
+    exclusionMode: ExclusionMode.Normal
+    margins { top: GlobalState.popupTopMargin; right: GlobalState.config.geometry.marginRight }
     WlrLayershell.layer: WlrLayer.Overlay
     implicitWidth: GlobalState.config.geometry.width
     implicitHeight: GlobalState.config.geometry.height
@@ -38,8 +58,15 @@ PanelWindow {
     property string menuTitle: ""
     property string currentMenuType: ""
     property string audioTab: "sink"
+    property string deviceName: ""
 
     Process { id: execProcess }
+    Process {
+        id: deviceNameProcess
+        command: ["hostname"]
+        stdout: StdioCollector { onStreamFinished: root.deviceName = text.trim() }
+        Component.onCompleted: running = true
+    }
     function runCommand(argv) {
         if (!Array.isArray(argv) || argv.length === 0) {
             console.warn("[ControlPanel] runCommand expects a non-empty argv array")
@@ -141,11 +168,21 @@ PanelWindow {
     function openCustomMenu(type, title) {
         contextModel.clear(); root.menuTitle = title; root.currentMenuType = type; root.isMenuOpen = true; refreshMenuData()
     }
+    function consumeNetworkMenuRequest() {
+        if (!root.visible || !GlobalState.requestNetworkMenu) return
+        openCustomMenu("wifi", "СЕТИ · АЛХИМИЧЕСКИЙ КРУГ")
+        GlobalState.requestNetworkMenu = false
+    }
     function refreshMenuData() {
         contextModel.clear(); fetchWifiProcess.running = false; fetchBtProcess.running = false; fetchAudioProcess.running = false
         if (root.currentMenuType === "wifi") fetchWifiProcess.running = true
         else if (root.currentMenuType === "bt") fetchBtProcess.running = true
         else if (root.currentMenuType === "audio") fetchAudioProcess.running = true
+    }
+
+    Connections {
+        target: GlobalState
+        function onRequestNetworkMenuChanged() { root.consumeNetworkMenuRequest() }
     }
 
     property string pendingWifiSsid: ""
@@ -178,7 +215,13 @@ PanelWindow {
                 color: root.safeTheme.textMain
                 onAccepted: wifiPasswordDialog.connectToNetwork()
             }
-            Button { text: "Подключиться"; Layout.alignment: Qt.AlignRight; onClicked: wifiPasswordDialog.connectToNetwork() }
+            Button {
+                id: connectButton
+                text: "Подключиться"; Layout.alignment: Qt.AlignRight
+                hoverEnabled: true
+                onClicked: wifiPasswordDialog.connectToNetwork()
+                ThemeToolTip { targetItem: connectButton; visible: connectButton.hovered; text: "Подключиться к выбранной Wi-Fi сети" }
+            }
         }
         function connectToNetwork() {
             if (!wifiPasswordField.text) return
@@ -271,10 +314,13 @@ PanelWindow {
                                 font.pixelSize: 18
                             }
                             MouseArea {
+                                id: panelCloseHit
                                 anchors.fill: parent
+                                hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: GlobalState.isControlPanelOpen = false
+                                onClicked: GlobalState.closeControlPanel()
                             }
+                            ThemeToolTip { targetItem: panelCloseHit; visible: panelCloseHit.containsMouse; text: "Закрыть системную панель" }
                         }
                     }
 
@@ -296,8 +342,9 @@ PanelWindow {
                                 Layout.minimumWidth: 0
                                 // Explicit heights keep Loader/GridLayout from collapsing
                                 // custom Items whose root Item has no implicit size.
-                                Layout.preferredHeight: (modelData === "Volume" || modelData === "Mic") ? 108 :
-                                                       (modelData === "Appearance" ? 90 : 52)
+                                Layout.preferredHeight: (modelData === "Wifi" || modelData === "Bluetooth") ? 98 :
+                                                       ((modelData === "Volume" || modelData === "Mic") ? 108 :
+                                                       (modelData === "Appearance" ? 90 : 52))
                                 Layout.minimumHeight: Layout.preferredHeight
                                 
                                 property string moduleId: modelData
@@ -349,7 +396,8 @@ PanelWindow {
                         width: 28; height: 28; radius: 5
                         color: root.safeTheme.bgAlt
                         Text { anchors.centerIn: parent; text: "‹"; color: root.safeTheme.textLight; font.pixelSize: 22 }
-                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.isMenuOpen = false }
+                        MouseArea { id: menuBackHit; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.isMenuOpen = false; GlobalState.isNetworkPortalOpen = false } }
+                        ThemeToolTip { targetItem: menuBackHit; visible: menuBackHit.containsMouse; text: "Вернуться к системным модулям" }
                     }
                     Text {
                         Layout.fillWidth: true
@@ -371,7 +419,121 @@ PanelWindow {
                         width: 28; height: 28; radius: 5
                         color: root.safeTheme.bgAlt
                         Text { anchors.centerIn: parent; text: "↻"; color: root.safeTheme.textMain; font.pixelSize: 16 }
-                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.refreshMenuData() }
+                        MouseArea { id: menuRefreshHit; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.refreshMenuData() }
+                        ThemeToolTip { targetItem: menuRefreshHit; visible: menuRefreshHit.containsMouse; text: "Обновить список устройств поблизости" }
+                    }
+                }
+
+                Item {
+                    visible: root.currentMenuType === "wifi" || root.currentMenuType === "bt"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: visible ? 292 : 0
+                    HoverHandler { id: orbitHover }
+                    Item {
+                        id: networkOrbit
+                        width: Math.min(parent.width, 286)
+                        height: width
+                        anchors.centerIn: parent
+                        RotationAnimation on rotation {
+                            from: 0; to: 360
+                            duration: GlobalState.animationDuration(30000)
+                            loops: Animation.Infinite
+                            running: GlobalState.idleEffectsEnabled && root.visible && !orbitHover.hovered
+                        }
+                        Rectangle {
+                            id: runeRing
+                            width: parent.width - 10; height: width; radius: width / 2
+                            anchors.centerIn: parent
+                            color: "transparent"
+                            border.width: 1
+                            border.color: root.safeTheme.rune
+                            opacity: 0.82
+                            Rectangle {
+                                anchors.fill: parent; anchors.margins: 13; radius: width / 2
+                                color: "transparent"; border.color: root.safeTheme.frame; opacity: 0.8
+                            }
+                            Repeater {
+                                model: ["ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ", "ᚷ", "ᚹ", "ᚺ", "ᛉ", "ᛟ", "ᛞ"]
+                                delegate: Text {
+                                    required property int index
+                                    required property string modelData
+                                    x: runeRing.width / 2 - width / 2 + Math.cos(index * Math.PI / 6) * (runeRing.width / 2 - 11)
+                                    y: runeRing.height / 2 - height / 2 + Math.sin(index * Math.PI / 6) * (runeRing.height / 2 - 11)
+                                    text: modelData
+                                    color: root.safeTheme.rune
+                                    font.pixelSize: 12
+                                    opacity: 0.96
+                                }
+                            }
+                        }
+                        Repeater {
+                            model: contextModel
+                            delegate: Rectangle {
+                                required property int index
+                                required property string itemId
+                                required property string itemName
+                                required property string itemExtra
+                                required property string itemType
+                                required property bool secured
+                                property real angle: (index * 360 / Math.max(1, contextModel.count) - 90) * Math.PI / 180
+                                visible: itemType === root.currentMenuType
+                                width: 88; height: 31; radius: 7
+                                x: networkOrbit.width / 2 - width / 2 + Math.cos(angle) * 91
+                                y: networkOrbit.height / 2 - height / 2 + Math.sin(angle) * 91
+                                rotation: -networkOrbit.rotation
+                                color: networkHit.containsMouse ? root.safeTheme.bgHover : root.safeTheme.bg
+                                border.width: 1
+                                border.color: networkHit.containsMouse ? root.safeTheme.accentActive : root.safeTheme.frame
+                                Behavior on color { ColorAnimation { duration: GlobalState.animationDuration(130) } }
+                                Behavior on border.color { ColorAnimation { duration: GlobalState.animationDuration(130) } }
+                                Text {
+                                    anchors.centerIn: parent
+                                    width: parent.width - 10
+                                    text: (itemType === "wifi" ? "ᛞ  " : "ᛒ  ") + (itemName || itemId)
+                                    color: networkHit.containsMouse ? root.safeTheme.textLight : root.safeTheme.textMain
+                                    font.family: root.safeTheme.font
+                                    font.pixelSize: 8
+                                    elide: Text.ElideRight
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
+                                MouseArea {
+                                    id: networkHit
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (itemType === "wifi") root.connectWifi(itemId, secured)
+                                        else if (itemType === "bt") {
+                                            root.execProcess.command = ["bluetoothctl", "connect", itemId]
+                                            root.execProcess.running = true
+                                        }
+                                    }
+                                }
+                                ThemeToolTip {
+                                    targetItem: networkHit
+                                    visible: networkHit.containsMouse
+                                    text: (itemName || itemId) + "\n" + (itemType === "wifi" ? (secured ? "Защищённая Wi-Fi сеть · подключиться" : "Открытая Wi-Fi сеть · подключиться") : (itemType === "bt" ? "Bluetooth · подключить устройство" : "Аудиоустройство · выбрать вывод или ввод"))
+                                }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        width: 84; height: 84; radius: 42
+                        anchors.centerIn: parent
+                        color: root.safeTheme.surfaceBottom
+                        border.width: 2; border.color: root.safeTheme.rune
+                        Rectangle { anchors.fill: parent; anchors.margins: 5; radius: width / 2; color: "transparent"; border.color: root.safeTheme.accentActive; opacity: 0.58 }
+                        Column {
+                            anchors.centerIn: parent; spacing: 2
+                            Text { anchors.horizontalCenter: parent.horizontalCenter; text: root.currentMenuType === "bt" ? "ᛒ" : "⌂"; color: root.safeTheme.accentGlow; font.pixelSize: 22 }
+                            Text { anchors.horizontalCenter: parent.horizontalCenter; width: 70; text: root.deviceName || "DFS"; color: root.safeTheme.rune; font.pixelSize: 8; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignHCenter }
+                        }
+                        SequentialAnimation on scale {
+                            running: GlobalState.idleEffectsEnabled && root.visible
+                            loops: Animation.Infinite
+                            NumberAnimation { to: 1.06; duration: GlobalState.animationDuration(1100); easing.type: Easing.InOutSine }
+                            NumberAnimation { to: 1.0; duration: GlobalState.animationDuration(1100); easing.type: Easing.InOutSine }
+                        }
                     }
                 }
 
@@ -387,6 +549,7 @@ PanelWindow {
 
                 ListView {
                     id: menuList
+                    visible: root.currentMenuType !== "wifi"
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true
@@ -498,6 +661,11 @@ PanelWindow {
                                 execProcess.running = false
                                 execProcess.running = true
                             }
+                        }
+                        ThemeToolTip {
+                            targetItem: menuMouse
+                            visible: menuMouse.containsMouse
+                            text: (itemName || itemId) + "\n" + (itemType === "audio" ? "Выбрать аудиоустройство" : "Подключить устройство")
                         }
                     }
                 }

@@ -120,12 +120,18 @@ Item {
                 }
 
                 MouseArea {
+                    id: workspaceHit
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true
                     onEntered: workspaceButton.hovered = true
                     onExited: workspaceButton.hovered = false
                     onClicked: CompositorAdapter.focusWorkspace(workspaceButton.workspaceId)
+                }
+                ThemeToolTip {
+                    targetItem: workspaceHit
+                    visible: workspaceHit.containsMouse
+                    text: "Перейти к рабочему столу " + workspaceButton.workspaceId
                 }
             }
         }

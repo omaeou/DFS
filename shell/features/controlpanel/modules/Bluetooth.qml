@@ -6,7 +6,7 @@ import "../../shared"
 Item {
     id: btMod
     implicitWidth: 150
-    implicitHeight: 52
+    implicitHeight: 98
 
     property var panel: null
     property var theme: GlobalState.effectiveTheme
@@ -77,10 +77,13 @@ Item {
                     }
                 }
                 MouseArea {
+                    id: powerHit
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: panel.runCommand(["bluetoothctl", "power", bluetoothEnabled ? "off" : "on"])
                 }
+                ThemeToolTip { targetItem: powerHit; visible: powerHit.containsMouse; text: bluetoothEnabled ? "Выключить Bluetooth" : "Включить Bluetooth" }
             }
             Rectangle { width: 1; Layout.fillHeight: true; Layout.margins: 6; color: theme.border }
             Item {
@@ -88,10 +91,13 @@ Item {
                 Layout.fillHeight: true
                 Text { anchors.centerIn: parent; text: ""; color: theme.textMain; font.family: theme.font }
                 MouseArea {
+                    id: devicesHit
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: panel.openCustomMenu("bt", "Bluetooth устройства")
                 }
+                ThemeToolTip { targetItem: devicesHit; visible: devicesHit.containsMouse; text: "Открыть список Bluetooth устройств" }
             }
         }
     }

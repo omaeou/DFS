@@ -12,6 +12,10 @@ QtObject {
         workspaces: Qt.resolvedUrl("../../features/workspaces/WorkspacesView.qml"),
         clock: Qt.resolvedUrl("../../features/clock/ClockView.qml"),
         systray: Qt.resolvedUrl("../../features/systray/SysTrayView.qml"),
+        musicPlayer: Qt.resolvedUrl("../../features/bar/modules/MusicControls.qml"),
+        notifications: Qt.resolvedUrl("../../features/bar/modules/NotificationsToggle.qml"),
+        networkToggle: Qt.resolvedUrl("../../features/bar/modules/NetworkToggle.qml"),
+        wallpaper: Qt.resolvedUrl("../../features/bar/modules/WallpaperToggle.qml"),
         controlPanelToggle: Qt.resolvedUrl("../../features/bar/modules/ControlPanelToggle.qml")
     })
 

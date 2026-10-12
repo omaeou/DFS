@@ -1,2 +1,4 @@
 module core.services
 singleton AudioService 1.0 AudioService.qml
+singleton MusicService 1.0 MusicService.qml
+singleton NotificationService 1.0 NotificationService.qml

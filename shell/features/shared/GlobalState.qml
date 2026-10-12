@@ -8,6 +8,10 @@ Singleton {
     id: state
 
     property bool isControlPanelOpen: false
+    property bool isNetworkPortalOpen: false
+    property bool requestNetworkMenu: false
+    property bool isEqualizerOpen: false
+    property bool isNotificationsOpen: false
     property string configError: ""
 
     readonly property var defaults: ({
@@ -15,13 +19,15 @@ Singleton {
         bar: {
             height: 60,
             margin: 10,
+            autoHide: false,
+            screenIds: [],
             layout: {
                 left: ["systemInfo", "activeWindow"],
                 center: ["workspaces", "clock"],
-                right: ["systray", "controlPanelToggle"]
+                right: ["musicPlayer", "notifications", "networkToggle", "wallpaper", "systray", "controlPanelToggle"]
             }
         },
-        geometry: { width: 356, height: 520, marginTop: 5, marginRight: 12 },
+        geometry: { width: 356, height: 575, marginTop: 5, marginRight: 12 },
         appearance: {
             skin: "bloodsteel",
             colorScheme: "crimson",
@@ -46,10 +52,14 @@ Singleton {
             SystemInfo: { showCpu: true, showMemory: true, showTemperature: true, showGpu: true, refreshInterval: 3000 },
             SysTray: { iconSize: 20, spacing: 8 }
         },
-        plugins: {}
+        plugins: {},
+        wallpapers: []
     })
 
     property var config: clone(defaults)
+    readonly property int popupTopMargin: config.bar.autoHide
+        ? config.bar.height + config.geometry.marginTop
+        : config.geometry.marginTop
 
     // Surface materials and palettes are intentionally separate: users can change
     // the ornament/material skin without losing their chosen accent color scheme.
@@ -237,6 +247,8 @@ Singleton {
                 throw new Error("modules must be an object")
             if (parsed.plugins !== undefined && !isPlainObject(parsed.plugins))
                 throw new Error("plugins must be an object")
+            if (parsed.wallpapers !== undefined && !Array.isArray(parsed.wallpapers))
+                throw new Error("wallpapers must be an array")
 
             stage = "migrate legacy config"
             // Migrate v1 configs written before presets existed. The old palette is
@@ -283,9 +295,15 @@ Singleton {
             requireStringArray(merged.bar.layout.center, "bar.layout.center")
             requireStringArray(merged.bar.layout.right, "bar.layout.right")
             requireStringArray(merged.layout, "layout")
+            if (merged.wallpapers.length > 0)
+                requireStringArray(merged.wallpapers, "wallpapers")
 
             requireNumber(merged.bar, "height", "bar.height", 30)
             requireNumber(merged.bar, "margin", "bar.margin", 0)
+            if (typeof merged.bar.autoHide !== "boolean")
+                throw new Error("bar.autoHide must be a boolean")
+            if (!Array.isArray(merged.bar.screenIds))
+                throw new Error("bar.screenIds must be an array")
             requireNumber(merged.geometry, "width", "geometry.width", 100)
             requireNumber(merged.geometry, "height", "geometry.height", 100)
             requireNumber(merged.geometry, "marginTop", "geometry.marginTop", 0)
@@ -387,6 +405,32 @@ Singleton {
         }
         configFile.setText(serialized)
         console.info("[GlobalState] Appearance applied:", key, "=", value)
+    }
+
+    function openNetworkPortal() {
+        state.isNetworkPortalOpen = true
+        state.requestNetworkMenu = true
+        state.isControlPanelOpen = true
+    }
+
+    function closeControlPanel() {
+        state.isControlPanelOpen = false
+        state.isNetworkPortalOpen = false
+        state.requestNetworkMenu = false
+    }
+
+    function toggleControlPanel() {
+        if (state.isControlPanelOpen)
+            closeControlPanel()
+        else
+            state.isControlPanelOpen = true
+    }
+
+    function toggleNetworkPortal() {
+        if (state.isControlPanelOpen && state.isNetworkPortalOpen)
+            closeControlPanel()
+        else
+            openNetworkPortal()
     }
 
     Component.onCompleted: {

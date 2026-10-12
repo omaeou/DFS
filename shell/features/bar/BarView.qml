@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Wayland
 import "../../core/modules"
 import "../shared"
 import "../../core/ui"
@@ -14,6 +15,8 @@ PanelWindow {
     anchors.bottom: false
     implicitHeight: GlobalState.config.bar.height
     color: "transparent"
+    WlrLayershell.layer: WlrLayer.Top
+    exclusiveZone: GlobalState.config.bar.autoHide ? 0 : GlobalState.config.bar.height
 
     Item {
         anchors.fill: parent
@@ -21,6 +24,12 @@ PanelWindow {
         anchors.rightMargin: GlobalState.config.bar.margin
         anchors.topMargin: 3
         anchors.bottomMargin: 3
+        opacity: GlobalState.config.bar.autoHide && !reveal.hovered ? 0.05 : 1
+        Behavior on opacity { NumberAnimation { duration: GlobalState.animationDuration(180) } }
+
+        HoverHandler {
+            id: reveal
+        }
 
         // Three visually independent metal capsules. There is deliberately no
         // line behind them: it previously crossed the gaps and looked broken.
@@ -39,7 +48,7 @@ PanelWindow {
                     // Without this, long active-window titles can expand the whole left capsule.
                     Layout.maximumWidth: moduleId === "activeWindow"
                         ? Math.max(100, Math.min(600, Number(GlobalState.config.modules.ActiveWindow.maxWidth) || 250))
-                        : -1
+                        : (moduleId === "musicPlayer" ? 196 : (moduleId === "networkToggle" ? 112 : -1))
                     source: ModuleRegistry.sourceFor(moduleId, "bar")
                     onSourceChanged: if (source === "") console.warn("[DFS] Unknown or disabled left-bar module:", moduleId)
                     onStatusChanged: if (status === Loader.Error) console.warn("[DFS] Failed to load left-bar module:", moduleId, source)
@@ -68,7 +77,7 @@ PanelWindow {
                     // Without this, long active-window titles can expand the whole left capsule.
                     Layout.maximumWidth: moduleId === "activeWindow"
                         ? Math.max(100, Math.min(600, Number(GlobalState.config.modules.ActiveWindow.maxWidth) || 250))
-                        : -1
+                        : (moduleId === "musicPlayer" ? 196 : (moduleId === "networkToggle" ? 112 : -1))
                     source: ModuleRegistry.sourceFor(moduleId, "bar")
                     onSourceChanged: if (source === "") console.warn("[DFS] Unknown or disabled center-bar module:", moduleId)
                     onStatusChanged: if (status === Loader.Error) console.warn("[DFS] Failed to load center-bar module:", moduleId, source)
@@ -99,7 +108,7 @@ PanelWindow {
                     // Without this, long active-window titles can expand the whole left capsule.
                     Layout.maximumWidth: moduleId === "activeWindow"
                         ? Math.max(100, Math.min(600, Number(GlobalState.config.modules.ActiveWindow.maxWidth) || 250))
-                        : -1
+                        : (moduleId === "musicPlayer" ? 196 : (moduleId === "networkToggle" ? 112 : -1))
                     source: ModuleRegistry.sourceFor(moduleId, "bar")
                     onSourceChanged: if (source === "") console.warn("[DFS] Unknown or disabled right-bar module:", moduleId)
                     onStatusChanged: if (status === Loader.Error) console.warn("[DFS] Failed to load right-bar module:", moduleId, source)

@@ -3,6 +3,8 @@
   "bar": {
     "height": 60,
     "margin": 10,
+    "autoHide": false,
+    "screenIds": [],
     "layout": {
       "left": [
         "systemInfo",
@@ -13,6 +15,10 @@
         "clock"
       ],
       "right": [
+        "musicPlayer",
+        "notifications",
+        "networkToggle",
+        "wallpaper",
         "systray",
         "controlPanelToggle"
       ]
@@ -20,12 +26,12 @@
   },
   "geometry": {
     "width": 356,
-    "height": 520,
+    "height": 575,
     "marginTop": 5,
     "marginRight": 12
   },
   "appearance": {
-    "skin": "ashen",
+    "skin": "obsidian",
     "colorScheme": "violet",
     "animations": "full",
     "motionScale": 1,
@@ -84,6 +90,12 @@
     "SysTray": {
       "iconSize": 20,
       "spacing": 8
+    },
+    "MusicPlayer": {
+      "showArtist": true
+    },
+    "Notifications": {
+      "showCount": true
     }
   },
   "plugins": {
@@ -95,5 +107,6 @@
         "label": "A sample plugin"
       }
     }
-  }
+  },
+  "wallpapers": []
 }

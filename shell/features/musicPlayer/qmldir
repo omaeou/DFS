@@ -1,0 +1,2 @@
+module features.musicPlayer
+MusicPlayerView 1.0 MusicPlayerView.qml

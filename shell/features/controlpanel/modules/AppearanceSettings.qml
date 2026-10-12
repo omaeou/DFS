@@ -97,9 +97,7 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: GlobalState.updateAppearance("ornaments", !GlobalState.config.appearance.ornaments)
                 }
-                ToolTip.visible: ornamentsMouse.containsMouse
-                ToolTip.text: "Металлические украшения: " + (ornamentsToggle.active ? "включены" : "выключены")
-                ToolTip.delay: 450
+                ThemeToolTip { targetItem: ornamentsMouse; visible: ornamentsMouse.containsMouse; text: "Металлические украшения: " + (ornamentsToggle.active ? "включены" : "выключены") }
             }
             Rectangle {
                 id: glowToggle
@@ -136,9 +134,7 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: GlobalState.updateAppearance("glow", !GlobalState.config.appearance.glow)
                 }
-                ToolTip.visible: glowMouse.containsMouse
-                ToolTip.text: "Свечение рун: " + (glowToggle.active ? "включено" : "выключено")
-                ToolTip.delay: 450
+                ThemeToolTip { targetItem: glowMouse; visible: glowMouse.containsMouse; text: "Свечение рун: " + (glowToggle.active ? "включено" : "выключено") }
             }
         }
 
@@ -148,6 +144,7 @@ Item {
 
             ComboBox {
                 id: skinCombo
+                hoverEnabled: true
                 Layout.fillWidth: true
                 Layout.preferredWidth: 98
                 Layout.minimumWidth: 80
@@ -214,10 +211,12 @@ Item {
                         border.color: root.theme.frame
                     }
                 }
+                ThemeToolTip { targetItem: skinCombo; visible: skinCombo.hovered; text: "Выбрать материал оболочки: сталь, обсидиан, нефрит и другие темы" }
             }
 
             ComboBox {
                 id: schemeCombo
+                hoverEnabled: true
                 Layout.fillWidth: true
                 Layout.preferredWidth: 98
                 Layout.minimumWidth: 80
@@ -284,10 +283,12 @@ Item {
                         border.color: root.theme.frame
                     }
                 }
+                ThemeToolTip { targetItem: schemeCombo; visible: schemeCombo.hovered; text: "Выбрать цвет свечения и активных рун" }
             }
 
             ComboBox {
                 id: animationCombo
+                hoverEnabled: true
                 Layout.fillWidth: true
                 Layout.preferredWidth: 98
                 Layout.minimumWidth: 80
@@ -354,6 +355,7 @@ Item {
                         border.color: root.theme.frame
                     }
                 }
+                ThemeToolTip { targetItem: animationCombo; visible: animationCombo.hovered; text: "Настроить интенсивность анимаций оболочки" }
             }
         }
         RowLayout {

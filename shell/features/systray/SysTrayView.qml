@@ -11,9 +11,10 @@ RowLayout {
     readonly property var theme: GlobalState.effectiveTheme
     spacing: Math.max(3, Number(settings.spacing) || 7)
 
-    QsMenuAnchor {
-        id: trayMenuAnchor
-        anchor.edges: Edges.Bottom | Edges.Left
+    LazyLoader {
+        id: trayMenuLoader
+        active: true
+        source: Qt.resolvedUrl("TrayContextMenu.qml")
     }
 
     Repeater {
@@ -31,9 +32,11 @@ RowLayout {
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
 
-            ToolTip.visible: containsMouse && modelData.title !== ""
-            ToolTip.text: modelData.title
-            ToolTip.delay: 450
+            ThemeToolTip {
+                targetItem: itemArea
+                visible: itemArea.containsMouse && modelData.title !== ""
+                text: modelData.title
+            }
 
             Rectangle {
                 anchors.fill: parent
@@ -47,12 +50,22 @@ RowLayout {
             onClicked: (mouse) => {
                 if (mouse.button === Qt.LeftButton && !modelData.onlyMenu) {
                     modelData.activate()
-                } else if (modelData.hasMenu && modelData.menu) {
-                    trayMenuAnchor.anchor.item = itemArea
-                    trayMenuAnchor.menu = modelData.menu
-                    trayMenuAnchor.open()
+                } else if (mouse.button === Qt.RightButton && modelData.hasMenu && modelData.menu) {
+                    const menu = trayMenuLoader.item
+                    if (!menu)
+                        return
+
+                    menu.showFor(itemArea, modelData.menu)
+                } else if (mouse.button === Qt.MiddleButton) {
+                    modelData.secondaryActivate()
                 } else if (mouse.button === Qt.RightButton) {
                     modelData.secondaryActivate()
+                } else if (modelData.hasMenu && modelData.menu) {
+                    // Menu-only tray entries (for example some status icons)
+                    // expose their menu as the primary action.
+                    const menu = trayMenuLoader.item
+                    if (menu)
+                        menu.showFor(itemArea, modelData.menu)
                 }
             }
 

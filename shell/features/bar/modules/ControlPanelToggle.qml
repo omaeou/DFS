@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 import "../../shared"
 
 Item {
@@ -39,12 +40,14 @@ Item {
         }
 
         MouseArea {
+            id: controlHit
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onEntered: root.hovered = true
             onExited: root.hovered = false
-            onClicked: GlobalState.isControlPanelOpen = !GlobalState.isControlPanelOpen
+            onClicked: GlobalState.toggleControlPanel()
         }
+        ThemeToolTip { targetItem: controlHit; visible: controlHit.containsMouse; text: GlobalState.isControlPanelOpen ? "Закрыть системную панель" : "Открыть системную панель" }
     }
 }

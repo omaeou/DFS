@@ -1,2 +1,3 @@
 module features.shared
 singleton GlobalState 1.0 GlobalState.qml
+ThemeToolTip 1.0 ThemeToolTip.qml
