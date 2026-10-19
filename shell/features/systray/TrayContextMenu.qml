@@ -15,11 +15,24 @@ PopupWindow {
     readonly property bool isSubmenu: parentMenuWindow !== null
     readonly property var theme: GlobalState.effectiveTheme
 
+    function safeMenuIcon(value) {
+        const icon = String(value || "")
+        if (!icon)
+            return ""
+        if (icon.startsWith("image://") || icon.startsWith("file:///"))
+            return icon
+        if (icon.startsWith("/"))
+            return "file://" + icon
+        if (icon.indexOf("/") < 0 && icon.indexOf(":") < 0)
+            return Quickshell.iconPath(icon, true)
+        return ""
+    }
+
     visible: requestedOpen && (!parentMenuWindow || parentMenuWindow.visible)
     grabFocus: true
     color: "transparent"
-    width: 292
-    height: Math.max(44, Math.min(520, menuList.implicitHeight + 16))
+    implicitWidth: 292
+    implicitHeight: Math.max(44, Math.min(520, menuList.implicitHeight + 16))
 
     anchor.item: anchorItem
     anchor.edges: isSubmenu ? (Edges.Right | Edges.Top) : (Edges.Bottom | Edges.Left)
@@ -190,8 +203,8 @@ PopupWindow {
                                 anchors.centerIn: parent
                                 width: 16
                                 height: 16
-                                visible: menuEntry.modelData.icon !== ""
-                                source: menuEntry.modelData.icon
+                                visible: root.safeMenuIcon(menuEntry.modelData.icon) !== ""
+                                source: root.safeMenuIcon(menuEntry.modelData.icon)
                                 sourceSize.width: width
                                 sourceSize.height: height
                                 fillMode: Image.PreserveAspectFit
@@ -221,6 +234,7 @@ PopupWindow {
                             anchors.rightMargin: 7
                             anchors.verticalCenter: parent.verticalCenter
                             text: menuEntry.modelData.text
+                            textFormat: Text.PlainText
                             color: rowMouse.containsMouse ? root.theme.textLight : root.theme.textMain
                             font.family: root.theme.font
                             font.pixelSize: 11

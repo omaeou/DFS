@@ -1,8 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
-import Quickshell.Io
 import "../../shared"
+import "../../../core/services"
 
 Item {
     id: wifiMod
@@ -11,31 +11,9 @@ Item {
     property var panel: null
     property var theme: GlobalState.effectiveTheme
     property var modConf: ({})
-    property string activeSsid: ""
-    property bool wifiEnabled: false
-    property bool wiredConnected: false
-
-    Timer {
-        interval: 2500
-        running: panel && panel.visible && !panel.isMenuOpen
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: { statusProcess.running = false; statusProcess.running = true }
-    }
-    Process {
-        id: statusProcess
-        command: ["sh", "-c", "printf '%s|%s|%s\\n' \"$(nmcli -t -f active,ssid dev wifi | awk -F: '$1 ~ /^yes$/ {print substr($0, index($0, \":\") + 1); exit}')\" \"$(nmcli radio wifi)\" \"$(nmcli -t -f TYPE,STATE dev | awk -F: '$1 ~ /ethernet/ && $2 ~ /connected/ {print 1; exit}')\""]
-        stdout: SplitParser {
-            onRead: data => {
-                const parts = data.trim().split("|")
-                if (parts.length >= 3) {
-                    wifiMod.activeSsid = parts[0]
-                    wifiMod.wifiEnabled = parts[1] === "enabled"
-                    wifiMod.wiredConnected = parts[2] === "1"
-                }
-            }
-        }
-    }
+    readonly property string activeSsid: ConnectivityService.activeSsid
+    readonly property bool wifiEnabled: ConnectivityService.wifiEnabled
+    readonly property bool wiredConnected: ConnectivityService.wiredConnected
 
     Rectangle {
         anchors.fill: parent
@@ -68,6 +46,7 @@ Item {
                     Text {
                         Layout.fillWidth: true
                         text: wifiMod.activeSsid || (wifiMod.wifiEnabled ? "Включён · нет сети" : "Выключен")
+                        textFormat: Text.PlainText
                         color: wifiMod.activeSsid ? theme.textLight : theme.textDark
                         font.family: theme.font; font.pixelSize: 8; elide: Text.ElideRight
                     }

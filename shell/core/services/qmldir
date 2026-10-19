@@ -1,4 +1,9 @@
 module core.services
 singleton AudioService 1.0 AudioService.qml
+singleton BluetoothService 1.0 BluetoothService.qml
+singleton ConnectivityService 1.0 ConnectivityService.qml
 singleton MusicService 1.0 MusicService.qml
 singleton NotificationService 1.0 NotificationService.qml
+singleton SystemInfoService 1.0 SystemInfoService.qml
+singleton WallpaperService 1.0 WallpaperService.qml
+singleton VpnService 1.0 VpnService.qml

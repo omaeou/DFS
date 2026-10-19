@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"dfs-daemon/internal/platform/hyprland"
@@ -38,7 +39,8 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	serverErr := make(chan error, 1)
-	go func() { serverErr <- server.Run(ctx) }()
+	tokenPath := filepath.Join(os.Getenv("XDG_RUNTIME_DIR"), "dfs-daemon-websocket.token")
+	go func() { serverErr <- server.Run(ctx, tokenPath) }()
 
 	adapter := &hyprland.Adapter{SocketPath: socketPath, Logger: log.Default()}
 	adapterErr := make(chan error, 1)

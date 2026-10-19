@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell.Io
 import "../../shared"
+import "../../../core/services"
 
 Item {
     id: btMod
@@ -11,23 +11,7 @@ Item {
     property var panel: null
     property var theme: GlobalState.effectiveTheme
     property var modConf: ({})
-    property bool bluetoothEnabled: false
-
-    Timer {
-        interval: 3000
-        running: panel && panel.visible && !panel.isMenuOpen
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: { stateProcess.running = false; stateProcess.running = true }
-    }
-
-    Process {
-        id: stateProcess
-        command: ["sh", "-c", "bluetoothctl show 2>/dev/null | awk -F': ' '/Powered:/ {print $2; exit}'"]
-        stdout: SplitParser {
-            onRead: data => { btMod.bluetoothEnabled = data.trim() === "yes" }
-        }
-    }
+    readonly property bool bluetoothEnabled: BluetoothService.powered
 
     Rectangle {
         anchors.fill: parent

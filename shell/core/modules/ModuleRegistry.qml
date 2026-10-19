@@ -16,7 +16,8 @@ QtObject {
         notifications: Qt.resolvedUrl("../../features/bar/modules/NotificationsToggle.qml"),
         networkToggle: Qt.resolvedUrl("../../features/bar/modules/NetworkToggle.qml"),
         wallpaper: Qt.resolvedUrl("../../features/bar/modules/WallpaperToggle.qml"),
-        controlPanelToggle: Qt.resolvedUrl("../../features/bar/modules/ControlPanelToggle.qml")
+        controlPanelToggle: Qt.resolvedUrl("../../features/bar/modules/ControlPanelToggle.qml"),
+        vpn: Qt.resolvedUrl("../../features/bar/modules/VpnToggle.qml")
     })
 
     readonly property var controlPanelBuiltins: ({

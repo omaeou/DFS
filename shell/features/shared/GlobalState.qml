@@ -24,7 +24,7 @@ Singleton {
             layout: {
                 left: ["systemInfo", "activeWindow"],
                 center: ["workspaces", "clock"],
-                right: ["musicPlayer", "notifications", "networkToggle", "wallpaper", "systray", "controlPanelToggle"]
+            right: ["musicPlayer", "notifications", "networkToggle", "vpn", "wallpaper", "systray", "controlPanelToggle"]
             }
         },
         geometry: { width: 356, height: 575, marginTop: 5, marginRight: 12 },
@@ -53,7 +53,8 @@ Singleton {
             SysTray: { iconSize: 20, spacing: 8 }
         },
         plugins: {},
-        wallpapers: []
+        wallpapers: [],
+        vpnProfiles: []
     })
 
     property var config: clone(defaults)
@@ -249,6 +250,8 @@ Singleton {
                 throw new Error("plugins must be an object")
             if (parsed.wallpapers !== undefined && !Array.isArray(parsed.wallpapers))
                 throw new Error("wallpapers must be an array")
+            if (parsed.vpnProfiles !== undefined && !Array.isArray(parsed.vpnProfiles))
+                throw new Error("vpnProfiles must be an array")
 
             stage = "migrate legacy config"
             // Migrate v1 configs written before presets existed. The old palette is
@@ -349,6 +352,19 @@ Singleton {
                     throw new Error("plugins." + pluginId + ".settings must be an object")
             })
 
+            merged.vpnProfiles.forEach(function (profile, index) {
+                if (!isPlainObject(profile))
+                    throw new Error("vpnProfiles[" + index + "] must be an object")
+                if (typeof profile.id !== "string" || profile.id.trim() === "")
+                    throw new Error("vpnProfiles[" + index + "].id must be a non-empty string")
+                if (typeof profile.name !== "string" || profile.name.trim() === "")
+                    throw new Error("vpnProfiles[" + index + "].name must be a non-empty string")
+                if (["command", "networkmanager", "openfortivpn"].indexOf(profile.backend) < 0)
+                    throw new Error("vpnProfiles[" + index + "].backend is invalid")
+                if (["none", "before", "challenge"].indexOf(profile.twoFactor || "none") < 0)
+                    throw new Error("vpnProfiles[" + index + "].twoFactor is invalid")
+            })
+
             stage = "commit config and dependent bindings"
             state.config = merged
             state.configError = ""
@@ -405,6 +421,18 @@ Singleton {
         }
         configFile.setText(serialized)
         console.info("[GlobalState] Appearance applied:", key, "=", value)
+    }
+
+    function updateVpnProfiles(profiles) {
+        const nextConfig = clone(state.config)
+        nextConfig.vpnProfiles = profiles
+        const serialized = JSON.stringify(nextConfig, null, 2)
+        if (!state.applyConfig(serialized)) {
+            console.warn("[GlobalState] VPN profiles were not applied:", state.configError)
+            return false
+        }
+        configFile.setText(serialized)
+        return true
     }
 
     function openNetworkPortal() {

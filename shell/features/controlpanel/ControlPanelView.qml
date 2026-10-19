@@ -4,6 +4,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
+import Quickshell.Networking
 import "../shared"
 import "../../core/modules"
 
@@ -36,7 +37,8 @@ PanelWindow {
             currentMenuType = ""
             audioTab = "sink"
             contextModel.clear()
-            fetchWifiProcess.running = false
+            wifiScanRefreshTimer.stop()
+            root.restoreWifiScanning()
             fetchBtProcess.running = false
             fetchAudioProcess.running = false
             if (wifiPasswordDialog.visible) wifiPasswordDialog.close()
@@ -59,6 +61,12 @@ PanelWindow {
     property string currentMenuType: ""
     property string audioTab: "sink"
     property string deviceName: ""
+    onIsMenuOpenChanged: {
+        if (!isMenuOpen) {
+            wifiScanRefreshTimer.stop()
+            root.restoreWifiScanning()
+        }
+    }
 
     Process { id: execProcess }
     Process {
@@ -79,33 +87,94 @@ PanelWindow {
 
     ListModel { id: contextModel }
 
-    // Device-list commands stay in the host so modules do not need shell access.
+    // Scanning is enabled only while the Wi-Fi menu is open. Preserve each
+    // device's previous setting and restore it when leaving the menu.
+    property var wifiScannerDevices: []
+    property var wifiScannerStates: []
+    property var selectedWifiNetwork: null
+    property string wifiConnectionMessage: ""
+    function wifiDevices() {
+        const result = []
+        const devices = Networking.devices.values
+        for (let i = 0; i < devices.length; ++i)
+            if (devices[i].type === DeviceType.Wifi) result.push(devices[i])
+        return result
+    }
+    function enableWifiScanning() {
+        const devices = wifiDevices()
+        for (let i = 0; i < devices.length; ++i) {
+            const device = devices[i]
+            if (wifiScannerDevices.indexOf(device) < 0) {
+                wifiScannerDevices.push(device)
+                wifiScannerStates.push(device.scannerEnabled)
+            }
+            device.scannerEnabled = true
+        }
+    }
+    function restoreWifiScanning() {
+        for (let i = 0; i < wifiScannerDevices.length; ++i)
+            wifiScannerDevices[i].scannerEnabled = wifiScannerStates[i]
+        wifiScannerDevices = []
+        wifiScannerStates = []
+    }
+    function refreshWifiNetworks() {
+        if (!root.visible || !root.isMenuOpen || root.currentMenuType !== "wifi") return
+        root.enableWifiScanning()
+        const found = []
+        const devices = root.wifiDevices()
+        for (let i = 0; i < devices.length; ++i) {
+            const networks = devices[i].networks.values
+            for (let j = 0; j < networks.length && found.length < 64; ++j) {
+                const network = networks[j]
+                const ssid = String(network.name || "").trim()
+                if (!ssid || ssid.length > 256) continue
+                let duplicate = false
+                for (let k = 0; k < found.length; ++k)
+                    if (found[k].itemId === ssid) { duplicate = true; break }
+                if (duplicate) continue
+                found.push({
+                    itemId: ssid,
+                    itemName: ssid,
+                    itemExtra: Math.round(Math.max(0, Math.min(1, Number(network.signalStrength) || 0)) * 100) + "%",
+                    itemType: "wifi",
+                    secured: network.security !== WifiSecurityType.Open
+                })
+            }
+        }
+        let changed = found.length !== contextModel.count
+        if (!changed) {
+            for (let i = 0; i < found.length; ++i) {
+                const current = contextModel.get(i)
+                if (current.itemId !== found[i].itemId || current.itemExtra !== found[i].itemExtra || current.secured !== found[i].secured) {
+                    changed = true
+                    break
+                }
+            }
+        }
+        if (changed) {
+            contextModel.clear()
+            for (let i = 0; i < found.length; ++i) contextModel.append(found[i])
+        }
+    }
+    Timer {
+        id: wifiScanRefreshTimer
+        interval: 1500
+        repeat: true
+        onTriggered: root.refreshWifiNetworks()
+    }
     Process {
-        id: fetchWifiProcess
-        // Force a fresh scan; otherwise NetworkManager may return only the one
-        // access point left in its cache when this menu was opened.
-        command: ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list", "--rescan", "yes"]
+        id: fetchBtProcess
+        command: ["bluetoothctl", "devices"]
         stdout: SplitParser {
             onRead: data => {
-                let fields = [], value = "", escaped = false
-                for (let i = 0; i < data.length; ++i) {
-                    const ch = data[i]
-                    if (escaped) { value += ch; escaped = false }
-                    else if (ch === "\\") escaped = true
-                    else if (ch === ":" && fields.length < 2) { fields.push(value); value = "" }
-                    else value += ch
-                }
-                if (escaped) value += "\\"
-                fields.push(value)
-                const ssid = fields[0].trim()
-                if (!ssid) return
-                for (let i = 0; i < contextModel.count; ++i)
-                    if (contextModel.get(i).itemType === "wifi" && contextModel.get(i).itemId === ssid) return
-                contextModel.append({itemId: ssid, itemName: ssid, itemExtra: fields[1] + "%", itemType: "wifi", secured: fields[2].trim() !== ""})
+                if (contextModel.count >= 8 || data.length > 512)
+                    return
+                const match = data.trim().match(/^Device\s+([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})\s+(.+)$/)
+                if (match)
+                    contextModel.append({itemId: match[1], itemName: match[2], itemExtra: "", itemType: "bt", secured: false})
             }
         }
     }
-    Process { id: fetchBtProcess; command: ["sh", "-c", "bluetoothctl devices | head -n 8 | awk '{mac=$2; $1=\"\"; $2=\"\"; sub(/^[ \\t]+/, \"\"); print mac\"|\"$0}'"]; stdout: SplitParser { onRead: data => { let p = data.trim().split("|"); if(p.length >= 2) contextModel.append({itemId: p[0], itemName: p[1], itemExtra: "", itemType: "bt", secured: false}) } } }
     function cleanedAudioLabel(value) {
         const label = String(value || "").trim()
         if (!label || label === "(null)" || label.toLowerCase() === "unknown") return ""
@@ -166,6 +235,10 @@ PanelWindow {
     }
 
     function openCustomMenu(type, title) {
+        if (root.currentMenuType === "wifi" && type !== "wifi") {
+            wifiScanRefreshTimer.stop()
+            root.restoreWifiScanning()
+        }
         contextModel.clear(); root.menuTitle = title; root.currentMenuType = type; root.isMenuOpen = true; refreshMenuData()
     }
     function consumeNetworkMenuRequest() {
@@ -174,10 +247,22 @@ PanelWindow {
         GlobalState.requestNetworkMenu = false
     }
     function refreshMenuData() {
-        contextModel.clear(); fetchWifiProcess.running = false; fetchBtProcess.running = false; fetchAudioProcess.running = false
-        if (root.currentMenuType === "wifi") fetchWifiProcess.running = true
-        else if (root.currentMenuType === "bt") fetchBtProcess.running = true
-        else if (root.currentMenuType === "audio") fetchAudioProcess.running = true
+        contextModel.clear(); fetchBtProcess.running = false; fetchAudioProcess.running = false
+        if (root.currentMenuType === "wifi") {
+            root.refreshWifiNetworks()
+            wifiScanRefreshTimer.start()
+        } else if (root.currentMenuType === "bt") {
+            wifiScanRefreshTimer.stop()
+            root.restoreWifiScanning()
+            fetchBtProcess.running = true
+        } else if (root.currentMenuType === "audio") {
+            wifiScanRefreshTimer.stop()
+            root.restoreWifiScanning()
+            fetchAudioProcess.running = true
+        } else {
+            wifiScanRefreshTimer.stop()
+            root.restoreWifiScanning()
+        }
     }
 
     Connections {
@@ -187,14 +272,28 @@ PanelWindow {
 
     property string pendingWifiSsid: ""
     function connectWifi(ssid, secured) {
-        if (!secured) {
-            execProcess.command = ["nmcli", "device", "wifi", "connect", ssid]
-            execProcess.running = true
+        const devices = root.wifiDevices()
+        let network = null
+        for (let i = 0; i < devices.length && network === null; ++i) {
+            const networks = devices[i].networks.values
+            for (let j = 0; j < networks.length; ++j) {
+                if (String(networks[j].name || "") === ssid) {
+                    network = networks[j]
+                    break
+                }
+            }
+        }
+        if (!network) {
+            root.wifiConnectionMessage = "Сеть больше не доступна. Обновляю список…"
+            root.refreshWifiNetworks()
             return
         }
-        pendingWifiSsid = ssid
-        wifiPasswordField.text = ""
-        wifiPasswordDialog.open()
+        root.selectedWifiNetwork = network
+        root.wifiConnectionMessage = ""
+        if (network.stateChanging) return
+        // Let NetworkManager use a saved secret first. If no key is available,
+        // the failure signal opens our themed PSK prompt for supported Wi-Fi.
+        network.connect()
     }
     Dialog {
         id: wifiPasswordDialog
@@ -203,10 +302,11 @@ PanelWindow {
         anchors.centerIn: parent
         width: Math.min(root.width - 40, 310)
         standardButtons: Dialog.Cancel
+        onRejected: { wifiPasswordField.clear(); root.pendingWifiSsid = "" }
         background: Rectangle { color: root.safeTheme.bg; radius: 9; border.color: root.safeTheme.frame }
         contentItem: ColumnLayout {
             spacing: 9
-            Text { text: root.pendingWifiSsid; color: root.safeTheme.textMain; font.family: root.safeTheme.font; elide: Text.ElideRight; Layout.fillWidth: true }
+            Text { text: root.pendingWifiSsid; textFormat: Text.PlainText; color: root.safeTheme.textMain; font.family: root.safeTheme.font; elide: Text.ElideRight; Layout.fillWidth: true }
             TextField {
                 id: wifiPasswordField
                 Layout.fillWidth: true
@@ -225,9 +325,33 @@ PanelWindow {
         }
         function connectToNetwork() {
             if (!wifiPasswordField.text) return
-            root.execProcess.command = ["nmcli", "device", "wifi", "connect", root.pendingWifiSsid, "password", wifiPasswordField.text]
-            root.execProcess.running = true
+            const password = wifiPasswordField.text
+            const network = root.selectedWifiNetwork
+            wifiPasswordField.clear()
+            root.pendingWifiSsid = ""
             close()
+            if (network) network.connectWithPsk(password)
+        }
+    }
+    Connections {
+        target: root.selectedWifiNetwork
+        function onConnectedChanged() {
+            if (root.selectedWifiNetwork && root.selectedWifiNetwork.connected)
+                root.wifiConnectionMessage = ""
+        }
+        function onConnectionFailed(reason) {
+            const network = root.selectedWifiNetwork
+            const usesPsk = network && (
+                network.security === WifiSecurityType.WpaPsk ||
+                network.security === WifiSecurityType.Wpa2Psk ||
+                network.security === WifiSecurityType.Sae)
+            if (reason === ConnectionFailReason.NoSecrets && usesPsk) {
+                root.pendingWifiSsid = network.name
+                wifiPasswordField.clear()
+                wifiPasswordDialog.open()
+                return
+            }
+            root.wifiConnectionMessage = "Не удалось подключиться к выбранной сети (" + String(reason) + ")"
         }
     }
 
@@ -402,6 +526,7 @@ PanelWindow {
                     Text {
                         Layout.fillWidth: true
                         text: root.menuTitle
+                        textFormat: Text.PlainText
                         color: root.safeTheme.textLight
                         font.family: root.safeTheme.font
                         font.pixelSize: 14
@@ -490,6 +615,7 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     width: parent.width - 10
                                     text: (itemType === "wifi" ? "ᛞ  " : "ᛒ  ") + (itemName || itemId)
+                                    textFormat: Text.PlainText
                                     color: networkHit.containsMouse ? root.safeTheme.textLight : root.safeTheme.textMain
                                     font.family: root.safeTheme.font
                                     font.pixelSize: 8
@@ -526,7 +652,7 @@ PanelWindow {
                         Column {
                             anchors.centerIn: parent; spacing: 2
                             Text { anchors.horizontalCenter: parent.horizontalCenter; text: root.currentMenuType === "bt" ? "ᛒ" : "⌂"; color: root.safeTheme.accentGlow; font.pixelSize: 22 }
-                            Text { anchors.horizontalCenter: parent.horizontalCenter; width: 70; text: root.deviceName || "DFS"; color: root.safeTheme.rune; font.pixelSize: 8; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignHCenter }
+                            Text { anchors.horizontalCenter: parent.horizontalCenter; width: 70; text: root.deviceName || "DFS"; textFormat: Text.PlainText; color: root.safeTheme.rune; font.pixelSize: 8; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignHCenter }
                         }
                         SequentialAnimation on scale {
                             running: GlobalState.idleEffectsEnabled && root.visible
@@ -538,8 +664,8 @@ PanelWindow {
                 }
 
                 Text {
-                    visible: contextModel.count === 0
-                    text: "Нет доступных устройств или список пуст"
+                    visible: contextModel.count === 0 || root.wifiConnectionMessage !== ""
+                    text: root.wifiConnectionMessage || "Нет доступных устройств или список пуст"
                     color: root.safeTheme.textDark
                     font.family: root.safeTheme.font
                     font.pixelSize: 11
@@ -616,6 +742,7 @@ PanelWindow {
                             Text {
                                 width: parent.width
                                 text: itemName || itemId
+                                textFormat: Text.PlainText
                                 color: root.safeTheme.textMain
                                 font.family: root.safeTheme.font
                                 font.pixelSize: 11
@@ -624,6 +751,7 @@ PanelWindow {
                             Text {
                                 width: parent.width
                                 text: itemType === "wifi" ? (secured ? "Защищённая сеть · Wi-Fi" : "Открытая сеть · Wi-Fi") : (itemType === "bt" ? itemId : (itemType === "audio" ? (root.audioTab === "sink" ? "Устройство вывода" : "Устройство ввода") : ""))
+                                textFormat: Text.PlainText
                                 color: root.safeTheme.textDark
                                 font.family: root.safeTheme.font
                                 font.pixelSize: 9
@@ -636,6 +764,7 @@ PanelWindow {
                             anchors.rightMargin: 10
                             anchors.verticalCenter: parent.verticalCenter
                             text: itemExtra
+                            textFormat: Text.PlainText
                             color: root.safeTheme.accentActive
                             font.family: root.safeTheme.font
                             font.pixelSize: 10

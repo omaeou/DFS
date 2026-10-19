@@ -166,9 +166,9 @@ PanelWindow {
                     }
                     ColumnLayout {
                         Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: 4
-                        Text { Layout.fillWidth: true; text: MusicService.title; color: GlobalState.effectiveTheme.textLight; font.pixelSize: 13; font.bold: true; elide: Text.ElideRight }
-                        Text { Layout.fillWidth: true; text: MusicService.artist; color: GlobalState.effectiveTheme.textMain; font.pixelSize: 10; elide: Text.ElideRight }
-                        Text { Layout.fillWidth: true; text: "ИСТОЧНИК · " + (MusicService.playerName || "ожидание Spotify / MPRIS"); color: GlobalState.effectiveTheme.rune; font.pixelSize: 8; elide: Text.ElideRight }
+                        Text { Layout.fillWidth: true; text: MusicService.title; textFormat: Text.PlainText; color: GlobalState.effectiveTheme.textLight; font.pixelSize: 13; font.bold: true; elide: Text.ElideRight }
+                        Text { Layout.fillWidth: true; text: MusicService.artist; textFormat: Text.PlainText; color: GlobalState.effectiveTheme.textMain; font.pixelSize: 10; elide: Text.ElideRight }
+                        Text { Layout.fillWidth: true; text: "ИСТОЧНИК · " + (MusicService.playerName || "ожидание Spotify / MPRIS"); textFormat: Text.PlainText; color: GlobalState.effectiveTheme.rune; font.pixelSize: 8; elide: Text.ElideRight }
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignHCenter
@@ -241,7 +241,7 @@ PanelWindow {
                             Layout.fillWidth: true
                             Text { text: MusicService.positionText; color: GlobalState.effectiveTheme.textDark; font.pixelSize: 8 }
                             Item { Layout.fillWidth: true }
-                            Text { text: "ВЫХОД · " + root.activeOutput; color: GlobalState.effectiveTheme.textDark; font.pixelSize: 8; elide: Text.ElideRight; Layout.maximumWidth: 190 }
+                            Text { text: "ВЫХОД · " + root.activeOutput; textFormat: Text.PlainText; color: GlobalState.effectiveTheme.textDark; font.pixelSize: 8; elide: Text.ElideRight; Layout.maximumWidth: 190 }
                             Text { text: MusicService.lengthText; color: GlobalState.effectiveTheme.textDark; font.pixelSize: 8 }
                         }
                     }
@@ -250,8 +250,8 @@ PanelWindow {
 
             RowLayout {
                 Layout.fillWidth: true
-                Text { Layout.fillWidth: true; text: "ПРЕСЕТ · " + root.eqData.preset; color: GlobalState.effectiveTheme.rune; font.pixelSize: 9; font.letterSpacing: 0.8 }
-                Text { text: "EASYEFFECTS · " + root.currentPreset; color: GlobalState.effectiveTheme.textDark; font.pixelSize: 8; elide: Text.ElideRight; Layout.maximumWidth: 170 }
+                Text { Layout.fillWidth: true; text: "ПРЕСЕТ · " + root.eqData.preset; textFormat: Text.PlainText; color: GlobalState.effectiveTheme.rune; font.pixelSize: 9; font.letterSpacing: 0.8 }
+                Text { text: "EASYEFFECTS · " + root.currentPreset; textFormat: Text.PlainText; color: GlobalState.effectiveTheme.textDark; font.pixelSize: 8; elide: Text.ElideRight; Layout.maximumWidth: 170 }
             }
             GridLayout {
                 Layout.fillWidth: true; columns: 4; rowSpacing: 6; columnSpacing: 7

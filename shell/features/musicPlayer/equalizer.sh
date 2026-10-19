@@ -1,12 +1,27 @@
 #!/usr/bin/env bash
 
 set -o pipefail
+umask 077
 
-CACHE_DIR="$HOME/.cache/quickshell/music"
+HOME_DIR="${HOME:-}"
+if [[ "$HOME_DIR" != /* ]]; then
+    printf 'HOME must be an absolute path for equalizer state storage\n' >&2
+    exit 1
+fi
+CACHE_DIR="$HOME_DIR/.cache/quickshell/music"
 STATE_FILE="$CACHE_DIR/eq_state.json"
 RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 SOCKET_PATH="$RUNTIME_DIR/EasyEffectsServer"
-mkdir -p "$CACHE_DIR"
+if [[ "$RUNTIME_DIR" != /* ]]; then
+    printf 'XDG_RUNTIME_DIR must be an absolute path for the EasyEffects socket\n' >&2
+    exit 1
+fi
+if [[ -L "$CACHE_DIR" ]]; then
+    printf 'Refusing a symlinked equalizer state directory\n' >&2
+    exit 1
+fi
+mkdir -p -- "$CACHE_DIR" || exit 1
+chmod 700 -- "$CACHE_DIR" || exit 1
 
 write_state() {
     local preset="$1"

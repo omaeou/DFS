@@ -2,15 +2,21 @@ package websocket
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
-	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"dfs-daemon/internal/events"
@@ -23,6 +29,7 @@ const (
 	pingPeriod    = (pongWait * 9) / 10
 	maxReadBytes  = 1024
 	clientQueue   = 64
+	maxClients    = 8
 	publishBuffer = 128
 )
 
@@ -30,8 +37,10 @@ const (
 type Server struct {
 	address string
 	logger  *log.Logger
+	token   string
 	mu      sync.Mutex
 	clients map[*client]struct{}
+	slots   chan struct{}
 	publish chan events.Event
 	http    *http.Server
 }
@@ -54,6 +63,7 @@ func NewServer(address string, logger *log.Logger) (*Server, error) {
 		address: address,
 		logger:  logger,
 		clients: make(map[*client]struct{}),
+		slots:   make(chan struct{}, maxClients),
 		publish: make(chan events.Event, publishBuffer),
 	}, nil
 }
@@ -63,12 +73,9 @@ func validateLoopbackAddress(address string) error {
 	if err != nil {
 		return fmt.Errorf("invalid DFS_DAEMON_ADDR %q: %w", address, err)
 	}
-	if strings.EqualFold(host, "localhost") {
-		return nil
-	}
 	ip := net.ParseIP(host)
 	if ip == nil || !ip.IsLoopback() {
-		return fmt.Errorf("DFS daemon must bind to a loopback address; got %q", address)
+		return fmt.Errorf("DFS daemon must bind to a loopback IP literal; got %q", address)
 	}
 	return nil
 }
@@ -90,7 +97,7 @@ func (s *Server) Publish(event events.Event) {
 	}
 }
 
-func (s *Server) Run(ctx context.Context) error {
+func (s *Server) Run(ctx context.Context, tokenPath string) error {
 	upgrader := ws.Upgrader{
 		HandshakeTimeout: 5 * time.Second,
 		CheckOrigin: func(r *http.Request) bool {
@@ -113,6 +120,13 @@ func (s *Server) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", s.address, err)
 	}
+	token, err := writeAuthToken(tokenPath)
+	if err != nil {
+		_ = listener.Close()
+		return err
+	}
+	s.token = token
+	defer removeAuthToken(tokenPath, token)
 	s.logger.Printf("DFS WebSocket IPC listening at ws://%s/ws (loopback only)", s.address)
 	go s.broadcastLoop(ctx)
 	serveErr := make(chan error, 1)
@@ -143,8 +157,23 @@ func (s *Server) handleConnections(w http.ResponseWriter, r *http.Request, upgra
 		http.Error(w, "loopback clients only", http.StatusForbidden)
 		return
 	}
+	if !isAllowedOrigin(r.Header.Get("Origin")) {
+		http.Error(w, "origin not allowed", http.StatusForbidden)
+		return
+	}
+	if !authTokenMatches(r.URL.Query().Get("token"), s.token) {
+		http.Error(w, "authentication required", http.StatusForbidden)
+		return
+	}
+	select {
+	case s.slots <- struct{}{}:
+	default:
+		http.Error(w, "too many local clients", http.StatusServiceUnavailable)
+		return
+	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		<-s.slots
 		s.logger.Printf("WebSocket upgrade failed: %v", err)
 		return
 	}
@@ -205,17 +234,22 @@ func (s *Server) broadcastLoop(ctx context.Context) {
 				s.logger.Printf("Unable to serialize IPC event: %v", err)
 				continue
 			}
+			slowClients := make([]*client, 0)
 			s.mu.Lock()
 			for c := range s.clients {
 				select {
 				case c.send <- payload:
 				case <-c.done:
 				default:
-					// A slow consumer must not stall every other client.
-					go s.removeClient(c)
+					// Remove slow consumers after releasing the map lock. Creating
+					// a goroutine per dropped event could grow without a bound.
+					slowClients = append(slowClients, c)
 				}
 			}
 			s.mu.Unlock()
+			for _, c := range slowClients {
+				s.removeClient(c)
+			}
 		}
 	}
 }
@@ -225,6 +259,7 @@ func (s *Server) removeClient(c *client) {
 		s.mu.Lock()
 		delete(s.clients, c)
 		s.mu.Unlock()
+		<-s.slots
 		close(c.done)
 		_ = c.conn.Close()
 		s.logger.Printf("WebSocket client disconnected")
@@ -253,17 +288,65 @@ func isLoopbackRemote(remoteAddress string) bool {
 }
 
 func isAllowedOrigin(origin string) bool {
-	if origin == "" || origin == "null" || origin == "file://" {
-		return true
+	// Quickshell is a native peer and needs no browser origin. A web page on
+	// localhost or an opaque `null` origin must not be able to read window titles.
+	return origin == "" || origin == "file://"
+}
+
+func authTokenMatches(candidate, expected string) bool {
+	return expected != "" && subtle.ConstantTimeCompare([]byte(candidate), []byte(expected)) == 1
+}
+
+func writeAuthToken(path string) (string, error) {
+	if !filepath.IsAbs(path) || filepath.Base(path) == "." || filepath.Base(path) == string(filepath.Separator) {
+		return "", errors.New("WebSocket token path must be absolute and name a file")
 	}
-	parsed, err := url.Parse(origin)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return false
+	dir := filepath.Dir(path)
+	dirInfo, err := os.Lstat(dir)
+	if err != nil {
+		return "", fmt.Errorf("inspect WebSocket token directory %q: %w", dir, err)
 	}
-	host := parsed.Hostname()
-	if strings.EqualFold(host, "localhost") {
-		return true
+	if dirInfo.Mode()&os.ModeSymlink != 0 || !dirInfo.IsDir() ||
+		dirInfo.Mode().Perm()&0o077 != 0 || dirInfo.Mode().Perm()&0o700 != 0o700 {
+		return "", errors.New("WebSocket token directory must be a private directory with mode 0700")
 	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
+	stat, ok := dirInfo.Sys().(*syscall.Stat_t)
+	if !ok || int(stat.Uid) != os.Geteuid() {
+		return "", errors.New("WebSocket token directory must be owned by the current user")
+	}
+
+	randomBytes := make([]byte, 32)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", fmt.Errorf("generate WebSocket token: %w", err)
+	}
+	token := hex.EncodeToString(randomBytes)
+	temporary, err := os.CreateTemp(dir, ".dfs-websocket-token-*")
+	if err != nil {
+		return "", fmt.Errorf("create WebSocket token file: %w", err)
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return "", fmt.Errorf("protect WebSocket token file: %w", err)
+	}
+	if _, err := io.WriteString(temporary, token+"\n"); err != nil {
+		_ = temporary.Close()
+		return "", fmt.Errorf("write WebSocket token file: %w", err)
+	}
+	if err := temporary.Close(); err != nil {
+		return "", fmt.Errorf("close WebSocket token file: %w", err)
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return "", fmt.Errorf("publish WebSocket token file: %w", err)
+	}
+	return token, nil
+}
+
+func removeAuthToken(path, token string) {
+	contents, err := os.ReadFile(path)
+	if err != nil || !authTokenMatches(strings.TrimSpace(string(contents)), token) {
+		return
+	}
+	_ = os.Remove(path)
 }

@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import "../../../core/services"
 import "../../shared"
+import "."
 
 Item {
     id: root
@@ -21,6 +22,7 @@ Item {
             Text {
                 Layout.fillWidth: true
                 text: MusicService.available ? MusicService.title : "Нет воспроизведения"
+                textFormat: Text.PlainText
                 color: GlobalState.effectiveTheme.textMain
                 font.family: GlobalState.effectiveTheme.font
                 font.pixelSize: 9
@@ -31,6 +33,7 @@ Item {
             Text {
                 Layout.fillWidth: true
                 text: MusicService.available ? MusicService.artist : "Медиаплеер · открыть"
+                textFormat: Text.PlainText
                 color: GlobalState.effectiveTheme.textDark
                 font.family: GlobalState.effectiveTheme.font
                 font.pixelSize: 8
@@ -43,14 +46,14 @@ Item {
             spacing: 7
             Repeater {
                 model: ["⏮", MusicService.playing ? "⏸" : "▶", "⏭"]
-                delegate: Rectangle {
+                delegate: BarButtonPlate {
                     required property int index
                     required property string modelData
                     Layout.preferredWidth: index === 1 ? 34 : 28
                     Layout.preferredHeight: 27
-                    radius: 6
-                    color: index === 1 ? GlobalState.effectiveTheme.borderActive : GlobalState.effectiveTheme.bgAlt
-                    border.color: index === 1 ? GlobalState.effectiveTheme.accentActive : GlobalState.effectiveTheme.frame
+                    active: index === 1
+                    hovered: controlHit.containsMouse
+                    cornerRadius: 6
                     Text {
                         anchors.centerIn: parent
                         text: modelData

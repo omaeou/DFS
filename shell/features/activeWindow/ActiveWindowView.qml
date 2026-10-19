@@ -9,6 +9,7 @@ Text {
     property string windowTitle: "Void"
     readonly property var settings: GlobalState.config.modules.ActiveWindow || ({})
     text: windowTitle
+    textFormat: Text.PlainText
     color: GlobalState.effectiveTheme.accentActive
     font.family: GlobalState.effectiveTheme.font
     font.bold: true

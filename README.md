@@ -14,6 +14,7 @@ DFS — модульная оболочка рабочего стола на [Qu
 - Управление воспроизведением через MPRIS/`playerctl`, окно плеера и эквалайзер EasyEffects.
 - Уведомления, управление Wi-Fi и Bluetooth, громкостью и микрофоном.
 - Выбор обоев из заданного списка и переключаемые темы оболочки.
+- Профили VPN для NetworkManager, OpenFortiVPN и внешних клиентов.
 - Встроенные QML-модули и поддержка пользовательских плагинов.
 
 Некоторые модули используют внешние системные программы и работают только при наличии соответствующего сервиса или устройства.
@@ -23,10 +24,12 @@ DFS — модульная оболочка рабочего стола на [Qu
 - Linux и [Quickshell](https://quickshell.org/) с Qt Quick Controls и используемыми модулями Quickshell.
 - В том числе QML-модули `QtWebSockets`, `Quickshell.Hyprland`, `Quickshell.Services.Notifications`, `Quickshell.Services.Pipewire` и `Quickshell.Services.SystemTray`.
 - Hyprland для переключения рабочих столов и интеграции Go-демона с событиями композитора.
-- `playerctl` для MPRIS-плееров; `jq`, `curl` и `md5sum` используются скриптом получения метаданных и обложек.
+- `playerctl` для MPRIS-плееров; скрипты плеера также используют `jq`, `curl`, `python3` и утилиты `coreutils` (`timeout`, `head`, `sha256sum`, `wc`).
 - NetworkManager (`nmcli`) для Wi-Fi, BlueZ (`bluetoothctl`) для Bluetooth.
+- `openfortivpn` для соответствующего типа VPN-профиля; он не нужен, если используются другие клиенты.
+- `secret-tool` и активная системная связка ключей, если нужно сохранять пароли VPN.
 - EasyEffects с включённым локальным управляющим сокетом — для чтения и изменения полос эквалайзера.
-- `swww` и работающий `swww-daemon` — для переключения обоев.
+- `awww` и работающий `awww-daemon` — для переключения обоев.
 - Go — только если собираете необязательный демон DFS.
 
 Громкость и микрофон используют PipeWire API Quickshell; для выбора аудиоустройств также вызывается `pactl`.
@@ -53,7 +56,7 @@ qs -p "$PWD/shell/shell.qml"
 
 ### Демон Hyprland (необязательно)
 
-Go-демон пересылает события Hyprland оболочке по WebSocket, слушающему только loopback-интерфейс. Сейчас интерфейс активного окна использует это соединение. Рабочие столы получают состояние и команды напрямую через Quickshell.
+Go-демон пересылает события Hyprland оболочке по WebSocket, слушающему только loopback-интерфейс. Соединение требует случайный токен из приватного runtime-каталога пользователя. Сейчас интерфейс активного окна использует это соединение. Рабочие столы получают состояние и команды напрямую через Quickshell.
 
 Соберите демон из каталога репозитория:
 
@@ -80,11 +83,15 @@ exec-once = qs -p $HOME/.config/quickshell/dfs/shell.qml
 - `appearance.skin`, `appearance.colorScheme`, `appearance.animations`, `appearance.glow` и `appearance.ornaments` задают оформление и эффекты.
 - `layout` задаёт порядок встроенных модулей панели управления.
 - `modules` содержит параметры отдельных модулей; неизвестные параметры можно не добавлять.
-- `wallpapers` — массив путей к изображениям, которые переключает кнопка обоев.
+- `wallpapers` — массив путей к изображениям или каталогам. При открытии каталоги сканируются рекурсивно; ищутся PNG, JPG, JPEG, WEBP, AVIF, BMP, GIF, TIFF, PNM, TGA, Farbfeld и SVG. Поддержка AVIF зависит от сборки `awww`. Можно использовать абсолютные пути, пути относительно `shell/` и `~/`. Левая кнопка открывает выбор с миниатюрами, правая применяет следующие обои.
+- Кнопка VPN открывает список профилей. `.ovpn` можно импортировать через NetworkManager; для OpenFortiVPN есть отдельный профиль; для других клиентов задаются команды подключения и отключения.
+- Пароли VPN сохраняются через `secret-tool` в системной связке ключей, а не в `config.json`. NetworkManager использует собственные сохранённые секреты. Для OpenFortiVPN одноразовый код вводится до запуска; внешняя команда может запросить его во время входа.
 
 Поддерживаемые значения оформления: темы `bloodsteel`, `ashen`, `obsidian`, `verdigris`, `alchemy`, `runes`, `custom`; цветовые схемы `crimson`, `violet`, `frost`, `jade`, `amber`; анимации `full`, `balanced`, `reduced`, `off`.
 
-Встроенные ID панели: `systemInfo`, `activeWindow`, `workspaces`, `clock`, `musicPlayer`, `notifications`, `networkToggle`, `wallpaper`, `systray`, `controlPanelToggle`. Модули панели управления: `Wifi`, `Bluetooth`, `Volume`, `Mic`, `Appearance`.
+Встроенные ID панели: `systemInfo`, `activeWindow`, `workspaces`, `clock`, `musicPlayer`, `notifications`, `networkToggle`, `vpn`, `wallpaper`, `systray`, `controlPanelToggle`. Модули панели управления: `Wifi`, `Bluetooth`, `Volume`, `Mic`, `Appearance`.
+
+Краткая инструкция по доработке модулей и QML находится в [`QML_GUIDE.md`](QML_GUIDE.md).
 
 Пример настройки панели:
 
@@ -133,6 +140,7 @@ DFS is a modular desktop shell built with [Quickshell](https://quickshell.org/).
 - MPRIS/`playerctl` playback controls, a custom player window, and an EasyEffects equalizer.
 - Notifications, Wi-Fi and Bluetooth controls, volume, and microphone controls.
 - Wallpaper cycling from a configured list and switchable shell themes.
+- VPN profiles for NetworkManager, OpenFortiVPN, and configurable external clients.
 - Built-in QML modules and support for user plugins.
 
 Some modules depend on external system tools and require the matching service or device to be available.
@@ -142,10 +150,12 @@ Some modules depend on external system tools and require the matching service or
 - Linux and [Quickshell](https://quickshell.org/) with Qt Quick Controls and the Quickshell modules used by the shell.
 - This includes the `QtWebSockets`, `Quickshell.Hyprland`, `Quickshell.Services.Notifications`, `Quickshell.Services.Pipewire`, and `Quickshell.Services.SystemTray` QML modules.
 - Hyprland for workspace switching and compositor events consumed by the Go daemon.
-- `playerctl` for MPRIS players; the metadata and cover script also uses `jq`, `curl`, and `md5sum`.
-- NetworkManager (`nmcli`) for Wi-Fi and BlueZ (`bluetoothctl`) for Bluetooth.
+- `playerctl` for MPRIS players; the player scripts also use `jq`, `curl`, `python3`, and `coreutils` utilities (`timeout`, `head`, `sha256sum`, `wc`).
+- NetworkManager (`nmcli`) for Wi-Fi and VPN, BlueZ (`bluetoothctl`) for Bluetooth.
+- `openfortivpn` for its dedicated VPN profile type; this client is optional if you use other providers.
+- `secret-tool` and an unlocked Secret Service keyring if you want saved VPN passwords.
 - EasyEffects with its local control socket enabled to read and change equalizer bands.
-- `swww` and a running `swww-daemon` to cycle wallpapers.
+- `awww` and a running `awww-daemon` to cycle wallpapers.
 - Go only if you want to build the optional DFS daemon.
 
 Volume and microphone controls use Quickshell's PipeWire API. Audio-device selection also calls `pactl`.
@@ -172,7 +182,7 @@ qs -p "$PWD/shell/shell.qml"
 
 ### Hyprland daemon (optional)
 
-The Go daemon forwards Hyprland events to the shell over a WebSocket bound to the loopback interface. The active-window title currently uses this connection. Workspace state and switching use Quickshell directly.
+The Go daemon forwards Hyprland events to the shell over a WebSocket bound to the loopback interface. The connection also requires a random token from the user's private runtime directory. The active-window title currently uses this connection. Workspace state and switching use Quickshell directly.
 
 Build it from the repository:
 
@@ -199,11 +209,12 @@ The source configuration is `shell/config.json`. After installation, edit the co
 - `appearance.skin`, `appearance.colorScheme`, `appearance.animations`, `appearance.glow`, and `appearance.ornaments` control the visual theme and effects.
 - `layout` sets the order of built-in control-panel modules.
 - `modules` contains per-module settings; optional settings can be omitted.
-- `wallpapers` is an array of image paths used by the wallpaper button.
+- `wallpapers` accepts image files or directories. Directories are scanned recursively when the picker opens for PNG, JPG, JPEG, WEBP, AVIF, BMP, GIF, TIFF, PNM, TGA, Farbfeld, and SVG images. AVIF support depends on the `awww` build. Paths may be absolute, relative to `shell/`, or use `~/`. Left-click the wallpaper button to choose from previews; right-click applies the next image.
+- The VPN button opens saved profiles. Import `.ovpn` files through NetworkManager, use the OpenFortiVPN profile, or define commands for another client. Saved passwords use the system keyring.
 
 Supported appearance values: skins `bloodsteel`, `ashen`, `obsidian`, `verdigris`, `alchemy`, `runes`, `custom`; color schemes `crimson`, `violet`, `frost`, `jade`, `amber`; animation levels `full`, `balanced`, `reduced`, `off`.
 
-Built-in bar IDs: `systemInfo`, `activeWindow`, `workspaces`, `clock`, `musicPlayer`, `notifications`, `networkToggle`, `wallpaper`, `systray`, and `controlPanelToggle`. Control-panel module IDs: `Wifi`, `Bluetooth`, `Volume`, `Mic`, and `Appearance`.
+Built-in bar IDs: `systemInfo`, `activeWindow`, `workspaces`, `clock`, `musicPlayer`, `notifications`, `networkToggle`, `vpn`, `wallpaper`, `systray`, and `controlPanelToggle`. Control-panel module IDs: `Wifi`, `Bluetooth`, `Volume`, `Mic`, and `Appearance`.
 
 Example bar configuration:
 

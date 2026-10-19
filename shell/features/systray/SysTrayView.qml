@@ -11,6 +11,19 @@ RowLayout {
     readonly property var theme: GlobalState.effectiveTheme
     spacing: Math.max(3, Number(settings.spacing) || 7)
 
+    function safeIconSource(value) {
+        const icon = String(value || "")
+        if (!icon)
+            return ""
+        if (icon.startsWith("image://") || icon.startsWith("file:///"))
+            return icon
+        if (icon.startsWith("/"))
+            return "file://" + icon
+        if (icon.indexOf("/") < 0 && icon.indexOf(":") < 0)
+            return Quickshell.iconPath(icon, true)
+        return ""
+    }
+
     LazyLoader {
         id: trayMenuLoader
         active: true
@@ -73,7 +86,7 @@ RowLayout {
                 anchors.centerIn: parent
                 width: itemArea.iconSize
                 height: itemArea.iconSize
-                source: modelData.icon
+                source: root.safeIconSource(modelData.icon)
                 fillMode: Image.PreserveAspectFit
                 mipmap: true
                 smooth: true

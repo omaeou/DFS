@@ -42,6 +42,7 @@ ToolTip {
     contentItem: Text {
         id: label
         text: root.text
+        textFormat: Text.PlainText
         color: root.shellTheme.textLight
         font.family: root.shellTheme.font
         font.pixelSize: 9

@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import "../../shared"
+import "."
 
 Item {
     id: root
@@ -11,25 +12,11 @@ Item {
     height: implicitHeight
     property bool hovered: false
 
-    Rectangle {
+    BarButtonPlate {
         anchors.fill: parent
-        radius: 6
-        color: GlobalState.isControlPanelOpen ? GlobalState.effectiveTheme.borderActive :
-               (root.hovered ? GlobalState.effectiveTheme.bgHover : GlobalState.effectiveTheme.bgAlt)
-        border.width: 1
-        border.color: GlobalState.isControlPanelOpen ? GlobalState.effectiveTheme.accentActive : GlobalState.effectiveTheme.frame
-        Behavior on color { ColorAnimation { duration: GlobalState.animationDuration(120) } }
-        Behavior on border.color { ColorAnimation { duration: GlobalState.animationDuration(120) } }
-
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 3
-            radius: 4
-            color: "transparent"
-            border.width: GlobalState.ornamentsEnabled ? 1 : 0
-            border.color: GlobalState.effectiveTheme.rune
-            opacity: 0.2
-        }
+        active: GlobalState.isControlPanelOpen
+        hovered: root.hovered
+        cornerRadius: 6
 
         Text {
             anchors.centerIn: parent
