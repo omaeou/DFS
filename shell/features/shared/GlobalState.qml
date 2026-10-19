@@ -54,6 +54,13 @@ Singleton {
         },
         plugins: {},
         wallpapers: [],
+        wallpaperTransition: {
+            type: "grow",
+            duration: 0.65,
+            fps: "auto",
+            position: "center",
+            bezier: "0.16,1,0.30,1"
+        },
         vpnProfiles: []
     })
 
@@ -250,6 +257,8 @@ Singleton {
                 throw new Error("plugins must be an object")
             if (parsed.wallpapers !== undefined && !Array.isArray(parsed.wallpapers))
                 throw new Error("wallpapers must be an array")
+            if (parsed.wallpaperTransition !== undefined && !isPlainObject(parsed.wallpaperTransition))
+                throw new Error("wallpaperTransition must be an object")
             if (parsed.vpnProfiles !== undefined && !Array.isArray(parsed.vpnProfiles))
                 throw new Error("vpnProfiles must be an array")
 
@@ -300,6 +309,18 @@ Singleton {
             requireStringArray(merged.layout, "layout")
             if (merged.wallpapers.length > 0)
                 requireStringArray(merged.wallpapers, "wallpapers")
+            if (!isPlainObject(merged.wallpaperTransition))
+                throw new Error("wallpaperTransition must be an object")
+            if (["grow", "center", "outer", "wipe", "wave", "fade", "simple", "left", "right", "top", "bottom", "any", "random"].indexOf(merged.wallpaperTransition.type) < 0)
+                throw new Error("wallpaperTransition.type is not supported by awww")
+            requireNumber(merged.wallpaperTransition, "duration", "wallpaperTransition.duration", 0.1)
+            if (merged.wallpaperTransition.fps !== "auto" &&
+                (typeof merged.wallpaperTransition.fps !== "number" || !isFinite(merged.wallpaperTransition.fps) ||
+                 merged.wallpaperTransition.fps < 1 || merged.wallpaperTransition.fps > 255))
+                throw new Error("wallpaperTransition.fps must be auto or a number between 1 and 255")
+            if (typeof merged.wallpaperTransition.position !== "string" ||
+                typeof merged.wallpaperTransition.bezier !== "string")
+                throw new Error("wallpaperTransition.position and wallpaperTransition.bezier must be strings")
 
             requireNumber(merged.bar, "height", "bar.height", 30)
             requireNumber(merged.bar, "margin", "bar.margin", 0)

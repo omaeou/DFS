@@ -8,6 +8,7 @@ Singleton {
     id: service
 
     property var wallpaperSources: GlobalState.config.wallpapers || []
+    property var transitionSettings: GlobalState.config.wallpaperTransition || ({})
     property bool initialized: false
     property var wallpapers: []
     property int selectedIndex: -1
@@ -20,6 +21,7 @@ Singleton {
     property var scanErrors: []
     property int pendingIndex: -1
     property string pendingPath: ""
+    property string pendingAwwwExecutable: ""
 
     onWallpaperSourcesChanged: if (initialized) refreshWallpapers()
 
@@ -39,7 +41,16 @@ Singleton {
                 service.pendingPath = ""
                 return
             }
-            wallpaperProcess.exec([executable, "img", "--transition-type", "wipe", service.pendingPath])
+            service.pendingAwwwExecutable = executable
+            monitorRefreshProcess.exec(["hyprctl", "monitors", "-j"])
+        }
+    }
+
+    Process {
+        id: monitorRefreshProcess
+        stdout: StdioCollector { id: monitorRefreshOutput }
+        onExited: (exitCode, exitStatus) => {
+            service.applyWallpaperWithRefresh(monitorRefreshOutput.text)
         }
     }
 
@@ -57,6 +68,7 @@ Singleton {
             }
             service.pendingIndex = -1
             service.pendingPath = ""
+            service.pendingAwwwExecutable = ""
         }
     }
 
@@ -158,6 +170,42 @@ Singleton {
             lastError = ""
     }
 
+    function applyWallpaperWithRefresh(refreshOutput) {
+        const settings = transitionSettings || ({})
+        let fps = 60
+        if (settings.fps === "auto") {
+            try {
+                const monitors = JSON.parse(String(refreshOutput || ""))
+                let maximumRefresh = 0
+                for (let i = 0; i < monitors.length; i++) {
+                    const refreshRate = Number(monitors[i].refreshRate)
+                    if (isFinite(refreshRate) && refreshRate > maximumRefresh)
+                        maximumRefresh = refreshRate
+                }
+                if (maximumRefresh > 0)
+                    fps = Math.ceil(maximumRefresh)
+            } catch (error) {
+                fps = 60
+            }
+        } else {
+            const configuredFps = Number(settings.fps)
+            if (isFinite(configuredFps) && configuredFps > 0)
+                fps = Math.ceil(configuredFps)
+        }
+        fps = Math.max(1, Math.min(255, fps))
+
+        const args = [
+            "img",
+            "--transition-type", settings.type || "grow",
+            "--transition-duration", String(settings.duration || 0.65),
+            "--transition-fps", String(fps),
+            "--transition-pos", settings.position || "center",
+            "--transition-bezier", settings.bezier || "0.16,1,0.30,1",
+            pendingPath
+        ]
+        wallpaperProcess.exec([pendingAwwwExecutable].concat(args))
+    }
+
     function applyIndex(index) {
         if (scanning)
             return false
@@ -165,7 +213,7 @@ Singleton {
             lastError = "Добавьте путь к файлу или каталогу с изображениями в wallpapers в config.json."
             return false
         }
-        if (wallpaperProcess.running || awwwLookupProcess.running) {
+        if (wallpaperProcess.running || awwwLookupProcess.running || monitorRefreshProcess.running) {
             lastError = "Дождитесь завершения текущей смены обоев."
             return false
         }

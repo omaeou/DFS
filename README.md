@@ -84,6 +84,7 @@ exec-once = qs -p $HOME/.config/quickshell/dfs/shell.qml
 - `layout` задаёт порядок встроенных модулей панели управления.
 - `modules` содержит параметры отдельных модулей; неизвестные параметры можно не добавлять.
 - `wallpapers` — массив путей к изображениям или каталогам. При открытии каталоги сканируются рекурсивно; ищутся PNG, JPG, JPEG, WEBP, AVIF, BMP, GIF, TIFF, PNM, TGA, Farbfeld и SVG. Поддержка AVIF зависит от сборки `awww`. Можно использовать абсолютные пути, пути относительно `shell/` и `~/`. Левая кнопка открывает выбор с миниатюрами, правая применяет следующие обои.
+- `wallpaperTransition` настраивает переход `awww`: `type` — эффект, `duration` — длительность в секундах, `fps` — частота кадров или `auto`, `position` — центр эффекта, `bezier` — кривая перехода. `auto` берёт максимальную частоту активных мониторов, ограниченную максимумом `awww` в 255 FPS.
 - Кнопка VPN открывает список профилей. `.ovpn` можно импортировать через NetworkManager; для OpenFortiVPN есть отдельный профиль; для других клиентов задаются команды подключения и отключения.
 - Пароли VPN сохраняются через `secret-tool` в системной связке ключей, а не в `config.json`. NetworkManager использует собственные сохранённые секреты. Для OpenFortiVPN одноразовый код вводится до запуска; внешняя команда может запросить его во время входа.
 
@@ -210,6 +211,7 @@ The source configuration is `shell/config.json`. After installation, edit the co
 - `layout` sets the order of built-in control-panel modules.
 - `modules` contains per-module settings; optional settings can be omitted.
 - `wallpapers` accepts image files or directories. Directories are scanned recursively when the picker opens for PNG, JPG, JPEG, WEBP, AVIF, BMP, GIF, TIFF, PNM, TGA, Farbfeld, and SVG images. AVIF support depends on the `awww` build. Paths may be absolute, relative to `shell/`, or use `~/`. Left-click the wallpaper button to choose from previews; right-click applies the next image.
+- `wallpaperTransition` controls the `awww` transition: `type` selects the effect, `duration` is in seconds, `fps` accepts a number or `auto`, `position` sets the effect origin, and `bezier` sets its curve. `auto` uses the highest active monitor refresh rate, capped at `awww`'s 255 FPS limit.
 - The VPN button opens saved profiles. Import `.ovpn` files through NetworkManager, use the OpenFortiVPN profile, or define commands for another client. Saved passwords use the system keyring.
 
 Supported appearance values: skins `bloodsteel`, `ashen`, `obsidian`, `verdigris`, `alchemy`, `runes`, `custom`; color schemes `crimson`, `violet`, `frost`, `jade`, `amber`; animation levels `full`, `balanced`, `reduced`, `off`.
