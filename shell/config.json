@@ -114,19 +114,5 @@
     "~/hakuspace-archive/Wallpapers"
   ],
   "vpnProfiles": [
-    {
-      "backend": "openfortivpn",
-      "clientCommand": "openfortivpn",
-      "configPath": "",
-      "connectCommand": "",
-      "connectionName": "",
-      "disconnectCommand": "",
-      "host": "https:office.bcc.kz",
-      "id": "vpn-mvfgkkd90imww",
-      "name": "work",
-      "port": 443,
-      "twoFactor": "before",
-      "username": "kurbanol"
-    }
   ]
 }
