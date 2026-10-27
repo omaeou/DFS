@@ -7,12 +7,68 @@ import "."
 
 Item {
     id: root
-    implicitWidth: 196
+    property bool compact: false
+    implicitWidth: compact ? 72 : 196
     implicitHeight: 34
     width: implicitWidth
     height: implicitHeight
 
+    BarButtonPlate {
+        id: compactPlate
+        anchors.fill: parent
+        visible: root.compact
+        active: MusicService.available && MusicService.playing
+        hovered: compactHit.containsMouse
+
+        Row {
+            anchors.centerIn: parent
+            spacing: 2
+            Text {
+                text: "♫"
+                color: GlobalState.effectiveTheme.rune
+                font.family: GlobalState.effectiveTheme.font
+                font.pixelSize: 12
+            }
+            Text {
+                text: MusicService.available && MusicService.playing ? "Ⅱ" : "▶"
+                color: GlobalState.effectiveTheme.textLight
+                font.family: GlobalState.effectiveTheme.font
+                font.pixelSize: 10
+                font.bold: true
+            }
+            Text {
+                text: "Плеер"
+                color: GlobalState.effectiveTheme.textMain
+                font.family: GlobalState.effectiveTheme.font
+                font.pixelSize: 8
+            }
+        }
+
+        MouseArea {
+            id: compactHit
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            cursorShape: Qt.PointingHandCursor
+            onClicked: mouse => {
+                if (mouse.button === Qt.RightButton || !MusicService.available)
+                    GlobalState.isEqualizerOpen = true
+                else
+                    MusicService.togglePlayback()
+            }
+        }
+
+        ThemeToolTip {
+            targetItem: compactHit
+            visible: compactHit.containsMouse
+            text: MusicService.available
+                ? MusicService.title + "\n" + MusicService.artist + "\nНажмите: воспроизвести или приостановить · правый клик: открыть плеер"
+                : "Нажмите, чтобы открыть музыкальный плеер"
+        }
+    }
+
     RowLayout {
+        visible: !root.compact
         anchors.fill: parent
         spacing: 9
         ColumnLayout {

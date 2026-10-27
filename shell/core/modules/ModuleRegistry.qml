@@ -7,6 +7,7 @@ QtObject {
     id: registry
 
     readonly property var barBuiltins: ({
+        //greetingWindow: Qt.resolveUrl("../../features/GreetingWindow.qml"),
         systemInfo: Qt.resolvedUrl("../../features/systeminfo/SystemInfoView.qml"),
         activeWindow: Qt.resolvedUrl("../../features/activeWindow/ActiveWindowView.qml"),
         workspaces: Qt.resolvedUrl("../../features/workspaces/WorkspacesView.qml"),

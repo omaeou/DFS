@@ -1,3 +1,4 @@
 todo.txt
 daemon/dfs-daemon
 *.log
+shell/config.json

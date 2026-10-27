@@ -11,7 +11,6 @@ import "features/shared"
 // windows here so each module can be developed and configured independently.
 ShellRoot {
     id: root
-
     Variants {
         model: Quickshell.screens
         BarView {

@@ -9,7 +9,9 @@ Rectangle {
     property int spacing: 10
     readonly property var theme: GlobalState.effectiveTheme || ({ bg: "#0c0a0e", bgAlt: "#19171c", frame: "#594149", border: "#3b3037", rune: "#c5a47d", accent: "#8a1728", accentActive: "#ff334f", accentGlow: "#ff6579", textMain: "#d7cdd0", textLight: "#fff5f4", textDark: "#7d7179", font: "JetBrainsMono Nerd Font", elementRadius: 8 })
 
-    implicitHeight: Math.max(36, layout.implicitHeight + 14)
+    // A shared height keeps every bar group aligned even when its modules
+    // have different implicit heights (for example music and workspaces).
+    implicitHeight: Math.max(48, Number(GlobalState.config.bar.height) - 12)
     implicitWidth: layout.implicitWidth + 26
     height: implicitHeight
     width: implicitWidth
